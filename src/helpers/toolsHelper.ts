@@ -44,3 +44,29 @@ export function getPhotoUrl(photo?: string | null): string | null {
   const origin = new URL(DELCOM_BASEURL).origin;
   return `${origin}/${photo.replace(/^\//, "")}`;
 }
+
+// Mengubah tautan YouTube (youtu.be, watch?v=, embed, shorts) menjadi URL embed.
+export function getYoutubeEmbedUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+    let id: string | null = null;
+
+    if (host === "youtu.be") {
+      id = parsed.pathname.slice(1);
+    } else if (host === "youtube.com" || host === "m.youtube.com") {
+      if (parsed.pathname === "/watch") {
+        id = parsed.searchParams.get("v");
+      } else if (
+        parsed.pathname.startsWith("/embed/") ||
+        parsed.pathname.startsWith("/shorts/")
+      ) {
+        id = parsed.pathname.split("/")[2];
+      }
+    }
+
+    return id ? `https://www.youtube.com/embed/${id}` : null;
+  } catch {
+    return null;
+  }
+}
