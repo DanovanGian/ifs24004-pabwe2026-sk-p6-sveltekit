@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         CI = 'true'
-        NODE_VERSION = '20.18.0'
+        NODE_VERSION = '22.12.0'
         // Node hasil download dipasang lewat symlink node-dist di workspace
         PATH = "${WORKSPACE}/node-dist/bin:${PATH}"
     }
@@ -48,12 +48,11 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
+                // Hapus lockfile & node_modules agar npm memilih binary native
+                // yang cocok untuk Linux (workaround npm/cli#4828 untuk rolldown)
                 sh '''
-                    if [ -f package-lock.json ]; then
-                        npm ci --include=dev
-                    else
-                        npm install --include=dev
-                    fi
+                    rm -rf node_modules package-lock.json
+                    npm install --include=dev --include=optional --legacy-peer-deps
                 '''
             }
         }
