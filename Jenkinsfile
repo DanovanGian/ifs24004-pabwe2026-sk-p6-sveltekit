@@ -46,6 +46,19 @@ pipeline {
             }
         }
 
+        stage('Setup Bun') {
+            steps {
+                // Script build memakai "bun --bun vite build", jadi Bun harus ada.
+                // Dipasang lewat npm ke folder Node di workspace (sudah masuk PATH).
+                sh '''
+                    if ! command -v bun >/dev/null 2>&1; then
+                        npm install -g bun
+                    fi
+                    bun --version
+                '''
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 // Hapus lockfile & node_modules agar npm memilih binary native
