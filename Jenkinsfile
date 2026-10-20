@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         CI = 'true'
-        NODE_VERSION = '22.12.0'
+        NODE_VERSION = '22.20.0'
         // Node hasil download dipasang lewat symlink node-dist di workspace
         PATH = "${WORKSPACE}/node-dist/bin:${PATH}"
     }
