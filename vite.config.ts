@@ -9,6 +9,14 @@ import process from "process";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const port = Number(process.env.APP_PORT || env.APP_PORT) || 3005;
+  const baseUrl = env.VITE_DELCOM_BASEURL;
+
+  // Di Vercel, lebih baik build gagal daripada situs tayang dengan alamat API yang salah.
+  if (process.env.VERCEL && !baseUrl) {
+    throw new Error(
+      "VITE_DELCOM_BASEURL belum diisi di Environment Variables Vercel."
+    );
+  }
 
   return {
     plugins: [
@@ -36,9 +44,7 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1500,
     },
     define: {
-      DELCOM_BASEURL: JSON.stringify(
-        env.VITE_DELCOM_BASEURL || "http://localhost:8000/api/v1"
-      ),
+      DELCOM_BASEURL: JSON.stringify(baseUrl || "http://localhost:8000/api/v1"),
     },
     test: {
       globals: true,
