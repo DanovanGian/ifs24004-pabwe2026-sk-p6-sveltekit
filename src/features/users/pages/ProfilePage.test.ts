@@ -223,3 +223,21 @@ describe("ProfilePage - ubah kata sandi", () => {
     expect(screen.getByLabelText("Kata sandi baru")).toHaveValue("654321");
   });
 });
+
+describe("ProfilePage - ubah email", () => {
+  it("mengirim email yang diubah", async () => {
+    renderWithProviders(ProfilePage);
+
+    await fireEvent.input(screen.getByLabelText("Email"), {
+      target: { value: "baru@delcom.org" },
+    });
+    await fireEvent.submit(profileForm());
+
+    await waitFor(() =>
+      expect(userApi.updateProfile).toHaveBeenCalledWith({
+        name: "Delcom Testing",
+        email: "baru@delcom.org",
+      })
+    );
+  });
+});

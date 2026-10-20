@@ -103,3 +103,21 @@ describe("ChangeModal", () => {
     await waitFor(() => expect(showSuccessDialog).toHaveBeenCalled());
   });
 });
+
+describe("ChangeModal - deskripsi", () => {
+  it("mengirim deskripsi yang diubah", async () => {
+    render(ChangeModal, { props: { open: true, course } });
+
+    await fireEvent.input(screen.getByLabelText("Deskripsi"), {
+      target: { value: "Deskripsi baru" },
+    });
+    await fireEvent.submit(form());
+
+    await waitFor(() =>
+      expect(updateCourse).toHaveBeenCalledWith(5, {
+        title: "Lama",
+        description: "Deskripsi baru",
+      })
+    );
+  });
+});
