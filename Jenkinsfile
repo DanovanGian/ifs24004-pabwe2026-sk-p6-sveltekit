@@ -8,13 +8,34 @@ pipeline {
 
     environment {
         CI = 'true'
-        NODE_ENV = 'production'
+        NODE_VERSION = '20.18.0'
+        // Node hasil download dipasang lewat symlink node-dist di workspace
+        PATH = "${WORKSPACE}/node-dist/bin:${PATH}"
     }
 
     stages {
-        stage('Checkout') {
+        stage('Setup Node.js') {
             steps {
-                checkout scm
+                sh '''
+                    set -e
+                    ARCH=$(uname -m)
+                    case "$ARCH" in
+                        x86_64)  NODE_ARCH=x64 ;;
+                        aarch64) NODE_ARCH=arm64 ;;
+                        *) echo "Arsitektur tidak didukung: $ARCH"; exit 1 ;;
+                    esac
+
+                    DIR="node-v${NODE_VERSION}-linux-${NODE_ARCH}"
+
+                    if [ ! -d "$DIR" ]; then
+                        echo "Mengunduh Node.js ${NODE_VERSION} (${NODE_ARCH})..."
+                        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/${DIR}.tar.gz" -o node.tar.gz
+                        tar -xzf node.tar.gz
+                        rm -f node.tar.gz
+                    fi
+
+                    ln -sfn "$DIR" node-dist
+                '''
             }
         }
 
@@ -27,7 +48,6 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                // npm ci butuh package-lock.json; kalau tidak ada, pakai npm install
                 sh '''
                     if [ -f package-lock.json ]; then
                         npm ci --include=dev
@@ -40,7 +60,6 @@ pipeline {
 
         stage('Lint & Type Check') {
             steps {
-                // Tidak menggagalkan build jika script tidak tersedia
                 sh 'npm run check --if-present'
                 sh 'npm run lint --if-present'
             }
@@ -65,9 +84,6 @@ pipeline {
         }
         failure {
             echo 'Build gagal. Cek log di atas.'
-        }
-        always {
-            cleanWs(deleteDirs: true, disableDeferredWipeout: true)
         }
     }
 }
