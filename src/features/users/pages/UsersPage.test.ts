@@ -1,60 +1,44 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/svelte";
-import { userApi } from "../api/userApi";
-import { showErrorDialog } from "../../../helpers/toolsHelper";
-import { mockUser, renderWithProviders } from "../../../test-utils";
+import { fireEvent, screen } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+import { fail, makeUser, ok, renderWithProviders, typeInto } from "../../../test-utils";
+import { getUsers } from "../api/userApi";
 import UsersPage from "./UsersPage.svelte";
 
-vi.mock("../api/userApi", () => ({ userApi: { getUsers: vi.fn() } }));
-vi.mock("../../../helpers/toolsHelper", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../helpers/toolsHelper")>();
-  return { ...actual, showErrorDialog: vi.fn() };
-});
+vi.mock("../api/userApi");
 
-const users = [
-  { ...mockUser, id: 1, name: "Budi", email: "budi@delcom.org", photo: "" },
-  { ...mockUser, id: 2, name: "Citra", email: "citra@delcom.org", photo: "" },
+const people = [
+  makeUser({ id: 1, name: "Budi", email: "budi@del.ac.id" }),
+  makeUser({ id: 2, name: "Ani", email: "ani@kampus.id", photo: "https://x.test/ani.png" }),
 ];
 
-beforeEach(() => {
-  vi.mocked(userApi.getUsers).mockResolvedValue(users);
-});
-
 describe("UsersPage", () => {
-  it("menampilkan teks memuat lalu daftar pengguna", async () => {
-    let resolveUsers!: (value: typeof users) => void;
-    vi.mocked(userApi.getUsers).mockReturnValue(
-      new Promise((resolve) => (resolveUsers = resolve))
-    );
+  it("menampilkan status memuat", async () => {
+    vi.mocked(getUsers).mockReturnValue(new Promise(() => {}));
     renderWithProviders(UsersPage);
-
-    expect(screen.getByText("Memuat data...")).toBeInTheDocument();
-
-    resolveUsers(users);
-    await waitFor(() => expect(screen.getByText("Budi")).toBeInTheDocument());
-
-    expect(screen.getByText("budi@delcom.org")).toBeInTheDocument();
-    expect(screen.getByText("Citra")).toBeInTheDocument();
-    expect(screen.queryByText("Memuat data...")).not.toBeInTheDocument();
+    expect(await screen.findByText("Memuat pengguna...")).toBeInTheDocument();
   });
 
-  it("menampilkan pesan bila belum ada pengguna", async () => {
-    vi.mocked(userApi.getUsers).mockResolvedValue([]);
+  it("menampilkan pesan kosong bila gagal dimuat", async () => {
+    vi.mocked(getUsers).mockResolvedValue(fail());
     renderWithProviders(UsersPage);
-
-    await waitFor(() =>
-      expect(screen.getByText("Belum ada pengguna.")).toBeInTheDocument()
-    );
+    expect(await screen.findByText("Pengguna tidak ditemukan.")).toBeInTheDocument();
   });
 
-  it("menampilkan pesan error bila pemuatan gagal", async () => {
-    vi.mocked(userApi.getUsers).mockRejectedValue(new Error("Tidak diizinkan"));
+  it("menampilkan dan menyaring pengguna berdasarkan nama atau email", async () => {
+    vi.mocked(getUsers).mockResolvedValue(ok({ users: people }));
     renderWithProviders(UsersPage);
+    expect(await screen.findByText("Budi")).toBeInTheDocument();
+    expect(screen.getByText("Ani")).toBeInTheDocument();
 
-    await waitFor(() =>
-      expect(showErrorDialog).toHaveBeenCalledWith("Tidak diizinkan")
-    );
-    expect(screen.getByText("Belum ada pengguna.")).toBeInTheDocument();
+    const search = screen.getByLabelText("Cari pengguna");
+    await typeInto(search, "budi");
+    expect(screen.queryByText("Ani")).not.toBeInTheDocument();
+
+    await typeInto(search, "@kampus");
+    expect(screen.queryByText("Budi")).not.toBeInTheDocument();
+    expect(screen.getByText("Ani")).toBeInTheDocument();
+
+    await typeInto(search, "zzz");
+    expect(screen.getByText("Pengguna tidak ditemukan.")).toBeInTheDocument();
   });
 });

@@ -1,45 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { apiHelper } from "../../../helpers/apiHelper";
-import { authApi } from "./authApi";
+import { apiRequest } from "../../../helpers/apiHelper";
+import { postLogin, postRegister } from "./authApi";
 
-vi.mock("../../../helpers/apiHelper", () => ({
-  apiHelper: vi.fn(),
-}));
+vi.mock("../../../helpers/apiHelper");
 
 describe("authApi", () => {
-  it("register mengirim POST dan mengembalikan respons", async () => {
-    const response = { status: "success", message: "Berhasil" };
-    vi.mocked(apiHelper).mockResolvedValue(response as any);
-    const payload = { name: "A", email: "a@b.c", password: "123456" };
-
-    const result = await authApi.register(payload);
-
-    expect(apiHelper).toHaveBeenCalledWith("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    expect(result).toBe(response);
+  it("postLogin mengirim email dan password", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({ status: "success", message: "ok" });
+    const result = await postLogin("a@b.c", "rahasia");
+    expect(result.status).toBe("success");
+    expect(apiRequest).toHaveBeenCalledWith("POST", "/auth/login", { email: "a@b.c", password: "rahasia" });
   });
 
-  it("login mengembalikan data berisi user dan token", async () => {
-    const data = { user: { id: 1 }, token: "tok" };
-    vi.mocked(apiHelper).mockResolvedValue({ data } as any);
-    const payload = { email: "a@b.c", password: "123456" };
-
-    const result = await authApi.login(payload);
-
-    expect(apiHelper).toHaveBeenCalledWith("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
+  it("postRegister mengirim nama, email, dan password", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({ status: "success", message: "ok" });
+    await postRegister("Budi", "a@b.c", "rahasia");
+    expect(apiRequest).toHaveBeenCalledWith("POST", "/auth/register", {
+      name: "Budi",
+      email: "a@b.c",
+      password: "rahasia",
     });
-    expect(result).toBe(data);
-  });
-
-  it("logout mengirim POST ke /auth/logout", async () => {
-    vi.mocked(apiHelper).mockResolvedValue({ status: "success" } as any);
-
-    await authApi.logout();
-
-    expect(apiHelper).toHaveBeenCalledWith("/auth/logout", { method: "POST" });
   });
 });

@@ -11,6 +11,12 @@
     "strict": false,
     "moduleResolution": "bundler"
   },
-  "include": ["src", "test", "*"],
-  "exclude": ["src/service-worker"]
+  "include": [
+    "src",
+    "test",
+    "*"
+  ],
+  "exclude": [
+    "src/service-worker"
+  ]
 }

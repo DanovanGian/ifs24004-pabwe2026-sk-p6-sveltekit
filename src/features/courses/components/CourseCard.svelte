@@ -1,87 +1,56 @@
 <script lang="ts">
-  import { BookOpen, Star, Trash2, Users } from "lucide-svelte";
-  import Avatar from "../../common/components/Avatar.svelte";
-  import { getPhotoUrl } from "../../../helpers/toolsHelper";
-  import type { Course } from "../api/courseApi";
+  import { BookOpen, Star, Users } from "lucide-svelte";
+  import {
+    formatRating,
+    getCoverUrl,
+    getPhotoUrl,
+  } from "../../../helpers/toolsHelper";
 
-  interface Props {
-    course: Course;
-    isOwner?: boolean;
-    ondelete?: (course: Course) => void;
-  }
-
-  let { course, isOwner = false, ondelete = () => {} }: Props = $props();
-
-  let coverBroken = $state(false);
-  const cover = $derived(getPhotoUrl(course.cover));
-  const rating = $derived(
-    course.avg_ratings ? Number(course.avg_ratings).toFixed(1) : null
-  );
+  let { course }: { course: Course } = $props();
 </script>
 
-<article
-  class="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"
+<a
+  href={`/courses/${course.id}`}
+  class="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition hover:shadow-md"
 >
-  <a href={`/courses/${course.id}`} class="block">
-    {#if cover && !coverBroken}
+  <img
+    src={getCoverUrl(course.cover)}
+    alt={`Sampul ${course.title}`}
+    width="640"
+    height="160"
+    decoding="async"
+    class="h-40 w-full bg-indigo-50 object-cover"
+  />
+  <div class="flex flex-1 flex-col gap-3 p-4">
+    <h2 class="line-clamp-2 text-lg font-bold group-hover:text-indigo-600">
+      {course.title}
+    </h2>
+    <p class="line-clamp-2 text-sm text-slate-600">{course.description}</p>
+    <div class="flex items-center gap-2 text-sm text-slate-600">
       <img
-        src={cover}
-        alt={course.title}
-        onerror={() => (coverBroken = true)}
-        class="h-40 w-full object-cover"
+        src={getPhotoUrl(course.author.photo, course.author.name)}
+        alt={course.author.name}
+        width="24"
+        height="24"
+        loading="lazy"
+        decoding="async"
+        class="h-6 w-6 rounded-full object-cover"
       />
-    {:else}
-      <div
-        class="flex h-40 w-full items-center justify-center bg-gradient-to-br from-indigo-100 to-indigo-200 text-indigo-400"
-      >
-        <BookOpen size={40} />
-      </div>
-    {/if}
-  </a>
-
-  <div class="flex flex-1 flex-col p-4">
-    <a href={`/courses/${course.id}`}>
-      <h3 class="line-clamp-1 font-bold text-slate-900 hover:text-indigo-600">
-        {course.title}
-      </h3>
-    </a>
-    <p class="mt-1 line-clamp-2 text-sm text-slate-500">{course.description}</p>
-
-    <div class="mt-3 flex items-center gap-2">
-      <Avatar
-        name={course.author.name}
-        photo={course.author.photo}
-        class="h-6 w-6 text-xs"
-      />
-      <span class="truncate text-xs text-slate-600">{course.author.name}</span>
+      <span>{course.author.name}</span>
     </div>
-
-    <div class="mt-auto flex items-center justify-between pt-4 text-xs text-slate-500">
-      <div class="flex items-center gap-3">
-        <span class="flex items-center gap-1">
-          <Users size={14} />
-          {course.students.length}
-        </span>
-        <span class="flex items-center gap-1">
-          <BookOpen size={14} />
-          {course.total_contents}
-        </span>
-        <span class="flex items-center gap-1">
-          <Star size={14} class="text-amber-500" />
-          {rating ?? "-"}
-        </span>
-      </div>
-
-      {#if isOwner}
-        <button
-          type="button"
-          aria-label="Hapus kursus"
-          class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-          onclick={() => ondelete(course)}
-        >
-          <Trash2 size={16} />
-        </button>
-      {/if}
+    <div class="mt-auto flex items-center gap-4 text-xs text-slate-600">
+      <span class="flex items-center gap-1">
+        <BookOpen class="h-4 w-4" />
+        <span>{`${course.total_contents} materi`}</span>
+      </span>
+      <span class="flex items-center gap-1">
+        <Users class="h-4 w-4" />
+        <span>{`${course.students.length} peserta`}</span>
+      </span>
+      <span class="flex items-center gap-1">
+        <Star class="h-4 w-4" />
+        <span>{formatRating(course.avg_ratings)}</span>
+      </span>
     </div>
   </div>
-</article>
+</a>

@@ -1,71 +1,59 @@
-import { describe, expect, it } from "vitest";
-import { createRawSnippet, tick } from "svelte";
-import { render, screen } from "@testing-library/svelte";
 import { goto } from "$app/navigation";
-import {
-  authProfile,
-  authToken,
-  isAuthenticated,
-  isProfile,
-} from "../../auth/states/authStore";
-import { click, renderWithProviders } from "../../../test-utils";
+import { screen, waitFor } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
+import { get } from "svelte/store";
+import { describe, expect, it, vi } from "vitest";
+import { fail, makeUser, ok, renderWithProviders } from "../../../test-utils";
+import { getMe } from "../../users/api/userApi";
+import { authToken } from "../../auth/states/authStore";
 import CourseLayout from "./CourseLayout.svelte";
 
-const children = createRawSnippet(() => ({
-  render: () => "<p>Isi halaman</p>",
-}));
+vi.mock("../../users/api/userApi");
+
+const children = createRawSnippet(() => ({ render: () => "<p>konten halaman</p>" }));
 
 describe("CourseLayout", () => {
-  it("menampilkan navbar, sidebar, dan isi halaman saat sudah login", () => {
+  it("tanpa token: pindah ke halaman masuk", async () => {
     renderWithProviders(CourseLayout, { props: { children } });
-
-    expect(screen.getByText("Isi halaman")).toBeInTheDocument();
-    expect(screen.getByText("Delcom Testing")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Semua Kursus" })).toBeInTheDocument();
-    expect(goto).not.toHaveBeenCalled();
-  });
-
-  it("mengalihkan ke halaman masuk bila belum login", async () => {
-    renderWithProviders(CourseLayout, { props: { children }, user: null });
-    await tick();
-
-    expect(goto).toHaveBeenCalledWith("/auth/login");
+    await waitFor(() => expect(goto).toHaveBeenCalledWith("/auth/login"));
     expect(screen.getByText("Memuat...")).toBeInTheDocument();
-    expect(screen.queryByText("Isi halaman")).not.toBeInTheDocument();
+    expect(screen.queryByText("konten halaman")).not.toBeInTheDocument();
   });
 
-  it("menunggu selama profil dimuat, lalu mengalihkan bila token hilang", async () => {
-    authToken.set("tok");
-    authProfile.set(null);
-    isAuthenticated.set(false);
-    isProfile.set(true);
-    render(CourseLayout, { props: { children } });
-    await tick();
-
-    // Profil sedang dimuat: belum ada pengalihan.
-    expect(screen.getByText("Memuat...")).toBeInTheDocument();
+  it("dengan token tanpa profil: memuat profil lalu menampilkan konten", async () => {
+    vi.mocked(getMe).mockResolvedValue(ok({ user: makeUser() }));
+    renderWithProviders(CourseLayout, { token: "t", props: { children } });
+    expect(await screen.findByText("konten halaman")).toBeInTheDocument();
+    expect(getMe).toHaveBeenCalledOnce();
     expect(goto).not.toHaveBeenCalled();
-
-    // Pemuatan selesai tetapi token masih ada: tetap belum ada pengalihan.
-    isProfile.set(false);
-    await tick();
-    expect(goto).not.toHaveBeenCalled();
-
-    // Token hilang: baru dialihkan.
-    authToken.set(null);
-    await tick();
-    expect(goto).toHaveBeenCalledWith("/auth/login");
   });
 
-  it("membuka dan menutup sidebar lewat tombol menu dan latar gelap", async () => {
-    renderWithProviders(CourseLayout, { props: { children } });
+  it("token ditolak: sesi dibersihkan dan pindah ke halaman masuk", async () => {
+    vi.mocked(getMe).mockResolvedValue(fail("Unauthenticated."));
+    renderWithProviders(CourseLayout, { token: "basi", props: { children } });
+    await waitFor(() => expect(goto).toHaveBeenCalledWith("/auth/login"));
+    expect(get(authToken)).toBeNull();
+  });
 
-    expect(screen.queryByLabelText("Tutup menu")).not.toBeInTheDocument();
+  it("profil siap: sidebar bisa dibuka/ditutup dan logout mengarahkan ke masuk", async () => {
+    const { container } = renderWithProviders(CourseLayout, {
+      token: "t",
+      profile: makeUser(),
+      path: "/users",
+      props: { children },
+    });
+    expect(getMe).not.toHaveBeenCalled();
+    expect(screen.getByText("konten halaman")).toBeInTheDocument();
 
-    await click(screen.getByLabelText("Buka menu"));
-    expect(screen.getByLabelText("Tutup menu")).toBeInTheDocument();
+    const aside = container.querySelector("aside");
+    expect(aside).toHaveClass("hidden");
+    screen.getByRole("button", { name: "Buka menu" }).click();
+    await waitFor(() => expect(aside).not.toHaveClass("hidden"));
+    screen.getByRole("link", { name: "Profil" }).click();
+    await waitFor(() => expect(aside).toHaveClass("hidden"));
 
-    await click(screen.getByLabelText("Tutup menu"));
-    expect(screen.queryByLabelText("Tutup menu")).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "Keluar" }).click();
+    await waitFor(() => expect(goto).toHaveBeenCalledWith("/auth/login"));
+    expect(screen.queryByText("konten halaman")).not.toBeInTheDocument();
   });
 });

@@ -1,39 +1,54 @@
 <script lang="ts">
+  import { onMount, type Snippet } from "svelte";
   import { goto } from "$app/navigation";
-  import Navbar from "../components/Navbar.svelte";
-  import Sidebar from "../components/Sidebar.svelte";
+  import { page } from "$app/state";
   import {
-    authToken,
     authProfile,
-    isAuthenticated,
-    isProfile,
+    authToken,
+    loadProfile,
+    logout,
   } from "../../auth/states/authStore";
+  import CourseNavbar from "../components/CourseNavbar.svelte";
+  import CourseSidebar from "../components/CourseSidebar.svelte";
 
-  let { children } = $props();
+  let { children }: { children: Snippet } = $props();
 
   let sidebarOpen = $state(false);
 
-  const ready = $derived(Boolean($isAuthenticated && $authProfile));
+  const toggleSidebar = () => (sidebarOpen = !sidebarOpen);
+  const closeSidebar = () => (sidebarOpen = false);
 
-  // Tidak ada token dan tidak sedang memuat profil: arahkan ke halaman masuk.
+  // Tanpa token (atau setelah logout) pengguna diarahkan ke halaman masuk.
   $effect(() => {
-    if (!$isProfile && !$authToken) {
+    if (!$authToken) {
       goto("/auth/login");
+    }
+  });
+
+  onMount(() => {
+    if ($authToken && !$authProfile) {
+      loadProfile();
     }
   });
 </script>
 
-{#if ready}
-  <Navbar ontoggle={() => (sidebarOpen = !sidebarOpen)} />
-  <Sidebar open={sidebarOpen} onclose={() => (sidebarOpen = false)} />
-
-  <main class="pt-16 lg:pl-64">
-    <div class="mx-auto max-w-6xl p-6">
-      {@render children()}
-    </div>
+{#if $authProfile}
+  <CourseNavbar
+    profile={$authProfile}
+    onToggleSidebar={toggleSidebar}
+    onLogout={logout}
+  />
+  <CourseSidebar
+    open={sidebarOpen}
+    currentPath={page.url.pathname}
+    onClose={closeSidebar}
+  />
+  <main class="p-6 lg:ml-64">
+    {@render children()}
   </main>
 {:else}
-  <div class="flex min-h-screen items-center justify-center text-slate-500">
-    Memuat...
-  </div>
+  <main class="p-6">
+    <h1 class="sr-only">Delcom Courses</h1>
+    <p class="text-slate-600">Memuat...</p>
+  </main>
 {/if}

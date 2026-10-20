@@ -4,16 +4,27 @@
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Delcom Courses</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap"
-      rel="stylesheet"
+    <meta
+      name="description"
+      content="Ikuti kursus daring Delcom, pelajari materi video, pantau progres, dan bagikan kursusmu."
     />
+    <title>Delcom Courses</title>
+    <style>
+      /* Cangkang statis: landmark <main> dan <h1> untuk dokumen awal sebelum JS
+         merender aplikasi (ssr = false). Disembunyikan begitu aplikasi terpasang. */
+      .app-shell-text {
+        padding: 1.5rem;
+      }
+      .app-root:has(> :not(script)) ~ .app-shell {
+        display: none;
+      }
+    </style>
     %sveltekit.head%
   </head>
   <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen">
-    <div style="display: contents">%sveltekit.body%</div>
+    <div class="app-root" style="display: contents">%sveltekit.body%</div>
+    <main class="app-shell">
+      <h1 class="app-shell-text">Delcom Courses</h1>
+    </main>
   </body>
 </html>

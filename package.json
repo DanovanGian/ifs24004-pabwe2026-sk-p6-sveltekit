@@ -1,8 +1,11 @@
 {
-  "name": "ifs24004-pabwe2026-sk-p6-sveltekit",
+  "name": "ifs24025-pabwe2026-sk-p6-sveltekit",
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "start": "bun ./build",
     "dev": "vite dev",
@@ -35,7 +38,7 @@
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3",
+    "typescript": "^5.9.3",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
   }

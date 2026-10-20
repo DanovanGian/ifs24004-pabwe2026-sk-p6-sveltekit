@@ -1,19 +1,46 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach, vi } from "vitest";
+import Swal from "sweetalert2";
+import { afterEach, beforeEach, vi } from "vitest";
 
-vi.mock("$app/navigation", () => ({
-  goto: vi.fn(),
-}));
+// Ikon lucide-svelte diganti komponen kosong agar tes ringan.
+vi.mock("lucide-svelte", () => {
+  const stub = () => {};
+  const names = [
+    "ArrowLeft",
+    "BookOpen",
+    "Camera",
+    "Check",
+    "Circle",
+    "GraduationCap",
+    "LogOut",
+    "Menu",
+    "Pencil",
+    "Plus",
+    "Search",
+    "Star",
+    "Trash2",
+    "User",
+    "Users",
+    "Video",
+    "X",
+  ];
+  return Object.fromEntries(names.map((name) => [name, stub]));
+});
 
-// Objek biasa agar tes bisa mengubah pathname dan params sesuka hati.
+vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
+
 vi.mock("$app/state", () => ({
-  page: {
-    url: new URL("http://localhost/"),
-    params: {},
-  },
+  page: { url: new URL("http://localhost/"), params: {} },
 }));
+
+vi.mock("sweetalert2", () => ({ default: { fire: vi.fn() } }));
+
+beforeEach(() => {
+  vi.mocked(Swal.fire).mockResolvedValue({ isConfirmed: true } as never);
+});
 
 afterEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  vi.unstubAllGlobals();
   localStorage.clear();
 });

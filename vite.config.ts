@@ -1,6 +1,6 @@
 import { sveltekit } from "@sveltejs/kit/vite";
-import adapterBun from "@sveltejs/adapter-bun";
-import adapterVercel from "@sveltejs/adapter-vercel";
+import bunAdapter from "@sveltejs/adapter-bun";
+import vercelAdapter from "@sveltejs/adapter-vercel";
 import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig, loadEnv } from "vite";
@@ -9,22 +9,14 @@ import process from "process";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const port = Number(process.env.APP_PORT || env.APP_PORT) || 3005;
-  const baseUrl = env.VITE_DELCOM_BASEURL;
-
-  // Di Vercel, lebih baik build gagal daripada situs tayang dengan alamat API yang salah.
-  if (process.env.VERCEL && !baseUrl) {
-    throw new Error(
-      "VITE_DELCOM_BASEURL belum diisi di Environment Variables Vercel."
-    );
-  }
 
   return {
     plugins: [
       sveltekit({
-        // Di Vercel variabel VERCEL otomatis terisi; di laptopmu tidak.
+        inlineStyleThreshold: 25_000,
         adapter: process.env.VERCEL
-          ? adapterVercel()
-          : adapterBun({
+          ? vercelAdapter({ runtime: "nodejs24.x" })
+          : bunAdapter({
               envPrefix: "APP_",
               serverOptions: {
                 port: port,
@@ -44,7 +36,9 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1500,
     },
     define: {
-      DELCOM_BASEURL: JSON.stringify(baseUrl || "http://localhost:8000/api/v1"),
+      DELCOM_BASEURL: JSON.stringify(
+        env.VITE_DELCOM_BASEURL || "https://open-api.delcom.org/api/v1"
+      ),
     },
     test: {
       globals: true,

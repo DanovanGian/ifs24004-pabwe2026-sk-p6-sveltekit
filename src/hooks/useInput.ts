@@ -1,13 +1,10 @@
 import { writable } from "svelte/store";
 
-export function useInput(initialValue = "") {
-  const value = writable(initialValue);
-
-  const onChange = (event: Event) => {
-    value.set((event.target as HTMLInputElement).value);
+/** Hook input formulir: store nilai + fungsi reset ke nilai awal. */
+export function useInput(initial: string) {
+  const value = writable(initial);
+  return {
+    value,
+    reset: () => value.set(initial),
   };
-
-  const reset = () => value.set(initialValue);
-
-  return { value, onChange, reset };
 }

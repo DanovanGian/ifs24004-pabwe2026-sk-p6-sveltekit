@@ -1,88 +1,28 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@testing-library/svelte";
-import { click, makeCourse, renderWithProviders } from "../../../test-utils";
+import { screen } from "@testing-library/svelte";
+import { describe, expect, it } from "vitest";
+import { makeCourse, renderWithProviders } from "../../../test-utils";
 import CourseCard from "./CourseCard.svelte";
 
 describe("CourseCard", () => {
-  it("menampilkan data kursus", () => {
-    renderWithProviders(CourseCard, { props: { course: makeCourse() } });
-
-    expect(screen.getByText("Belajar ReactJS")).toBeInTheDocument();
-    expect(screen.getByText("Belajar ReactJS dari awal")).toBeInTheDocument();
-    expect(screen.getByText("Abdullah Ubaid")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument(); // peserta
-    expect(screen.getByText("3")).toBeInTheDocument(); // materi
-    expect(screen.getByText("4.0")).toBeInTheDocument(); // rating
-  });
-
-  it("menautkan ke halaman detail", () => {
-    renderWithProviders(CourseCard, { props: { course: makeCourse({ id: 7 }) } });
-
-    for (const link of screen.getAllByRole("link")) {
-      expect(link).toHaveAttribute("href", "/courses/7");
-    }
-  });
-
-  it("menampilkan sampul bila tersedia", () => {
-    renderWithProviders(CourseCard, { props: { course: makeCourse() } });
-
-    expect(screen.getByAltText("Belajar ReactJS")).toHaveAttribute(
-      "src",
-      "http://localhost/cover.jpg"
-    );
-  });
-
-  it("menampilkan pengganti bila tanpa sampul", () => {
+  it("menampilkan ringkasan kursus dan tautan detail", () => {
     renderWithProviders(CourseCard, {
-      props: { course: makeCourse({ cover: null }) },
+      props: { course: makeCourse({ students: [1, 2, 3], total_contents: 4 }) },
     });
-
-    expect(screen.queryByAltText("Belajar ReactJS")).not.toBeInTheDocument();
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/courses/10");
+    expect(screen.getByText("Belajar Svelte")).toBeInTheDocument();
+    expect(screen.getByText("Dasar-dasar Svelte")).toBeInTheDocument();
+    expect(screen.getByText("Budi")).toBeInTheDocument();
+    expect(screen.getByText(/4 materi/)).toBeInTheDocument();
+    expect(screen.getByText(/3 peserta/)).toBeInTheDocument();
+    expect(screen.getByText(/4\.5/)).toBeInTheDocument();
+    expect(screen.getByAltText("Sampul Belajar Svelte")).toHaveAttribute("src", "/logo.svg");
   });
 
-  it("beralih ke pengganti saat sampul gagal dimuat", async () => {
-    renderWithProviders(CourseCard, { props: { course: makeCourse() } });
-
-    await fireEvent.error(screen.getByAltText("Belajar ReactJS"));
-
-    expect(screen.queryByAltText("Belajar ReactJS")).not.toBeInTheDocument();
-  });
-
-  it("menampilkan tanda hubung bila belum ada rating", () => {
+  it("memakai sampul dan menampilkan teks bila belum ada rating", () => {
     renderWithProviders(CourseCard, {
-      props: { course: makeCourse({ avg_ratings: null }) },
+      props: { course: makeCourse({ cover: "https://x.test/c.png", avg_ratings: null }) },
     });
-
-    expect(screen.getByText("-")).toBeInTheDocument();
-  });
-
-  it("menyembunyikan tombol hapus bila bukan pemilik", () => {
-    renderWithProviders(CourseCard, {
-      props: { course: makeCourse(), isOwner: false },
-    });
-
-    expect(screen.queryByLabelText("Hapus kursus")).not.toBeInTheDocument();
-  });
-
-  it("memanggil ondelete dengan kursusnya bila pemilik menekan hapus", async () => {
-    const ondelete = vi.fn();
-    const course = makeCourse();
-    renderWithProviders(CourseCard, {
-      props: { course, isOwner: true, ondelete },
-    });
-
-    await click(screen.getByLabelText("Hapus kursus"));
-
-    expect(ondelete).toHaveBeenCalledWith(course);
-  });
-
-  it("aman dipakai tanpa ondelete (nilai bawaan)", async () => {
-    renderWithProviders(CourseCard, {
-      props: { course: makeCourse(), isOwner: true },
-    });
-
-    await click(screen.getByLabelText("Hapus kursus"));
-
-    expect(screen.getByLabelText("Hapus kursus")).toBeInTheDocument();
+    expect(screen.getByAltText("Sampul Belajar Svelte")).toHaveAttribute("src", "https://x.test/c.png");
+    expect(screen.getByText(/Belum ada rating/)).toBeInTheDocument();
   });
 });

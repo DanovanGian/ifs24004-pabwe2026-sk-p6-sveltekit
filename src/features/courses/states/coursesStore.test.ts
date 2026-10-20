@@ -1,296 +1,78 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { get } from "svelte/store";
-import { courseApi } from "../api/courseApi";
-import {
-  addContent,
-  addCourse,
-  changeContentStatus,
-  changeCover,
-  changeRating,
-  courseContent,
-  courseDetail,
-  courses,
-  deleteAllCourses,
-  deleteContent,
-  deleteCourse,
-  fetchCourseContent,
-  fetchCourseDetail,
-  fetchCourses,
-  getCoursesSnapshot,
-  isContentChanged,
-  isContentLoading,
-  isCourseChanged,
-  isCoursesLoading,
-  isCoverChanged,
-  isDetailLoading,
-  isRatingChanged,
-  isStudentChanged,
-  joinCourse,
-  leaveCourse,
-  resetCoursesState,
-  resetMutationFlags,
-  updateContent,
-  updateCourse,
-} from "./coursesStore";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fail, makeContent, makeCourse, makeDetail, ok, resetStores } from "../../../test-utils";
+import * as api from "../api/courseApi";
+import * as store from "./coursesStore";
 
-vi.mock("../api/courseApi", () => ({
-  courseApi: {
-    getCourses: vi.fn(),
-    getCourseById: vi.fn(),
-    addCourse: vi.fn(),
-    updateCourse: vi.fn(),
-    changeCover: vi.fn(),
-    deleteCourse: vi.fn(),
-    deleteAllCourses: vi.fn(),
-    joinCourse: vi.fn(),
-    leaveCourse: vi.fn(),
-    changeRating: vi.fn(),
-    addContent: vi.fn(),
-    updateContent: vi.fn(),
-    getContentById: vi.fn(),
-    deleteContent: vi.fn(),
-    changeContentStatus: vi.fn(),
-  },
-}));
+vi.mock("../api/courseApi");
 
-const makeCourse = (id: number, title = "Kursus") => ({ id, title }) as any;
-const detail = { id: 5, title: "Detail" } as any;
-const content = { id: 9, title: "Materi" } as any;
-const payload = { title: "T", description: "D" };
-const contentPayload = { title: "M", youtube: "https://youtu.be/abc" };
+beforeEach(resetStores);
 
-beforeEach(() => {
-  resetCoursesState();
-  for (const fn of Object.values(courseApi)) {
-    vi.mocked(fn).mockReset();
-    vi.mocked(fn).mockResolvedValue({} as any);
-  }
-  vi.mocked(courseApi.getCourses).mockResolvedValue([]);
-  vi.mocked(courseApi.getCourseById).mockResolvedValue(detail);
-  vi.mocked(courseApi.getContentById).mockResolvedValue(content);
-});
+describe("pemuatan", () => {
+  it("loadCourses: sukses mengisi, gagal mengosongkan", async () => {
+    vi.mocked(api.getCourses).mockResolvedValue(ok({ courses: [makeCourse()] }));
+    await store.loadCourses(true);
+    expect(api.getCourses).toHaveBeenCalledWith(true);
+    expect(get(store.courses)).toHaveLength(1);
+    expect(get(store.isCoursesLoading)).toBe(false);
 
-describe("memuat data", () => {
-  it("fetchCourses mengisi daftar dan mematikan status memuat", async () => {
-    const list = [makeCourse(1)];
-    vi.mocked(courseApi.getCourses).mockResolvedValue(list);
-
-    const promise = fetchCourses();
-    expect(get(isCoursesLoading)).toBe(true);
-    await promise;
-
-    expect(get(courses)).toBe(list);
-    expect(get(isCoursesLoading)).toBe(false);
+    vi.mocked(api.getCourses).mockResolvedValue(fail());
+    await store.loadCourses(false);
+    expect(get(store.courses)).toEqual([]);
   });
 
-  it("fetchCourses mengingat filter terakhir", async () => {
-    await fetchCourses(true);
-    await fetchCourses();
+  it("loadCourse: sukses mengisi, gagal menjadi null", async () => {
+    vi.mocked(api.getCourse).mockResolvedValue(ok({ course: makeDetail() }));
+    await store.loadCourse(10);
+    expect(get(store.course)?.id).toBe(10);
+    expect(get(store.isCourseLoading)).toBe(false);
 
-    expect(courseApi.getCourses).toHaveBeenNthCalledWith(1, true);
-    expect(courseApi.getCourses).toHaveBeenNthCalledWith(2, true);
+    vi.mocked(api.getCourse).mockResolvedValue(fail());
+    await store.loadCourse(10);
+    expect(get(store.course)).toBeNull();
   });
 
-  it("fetchCourses melempar ulang error dan mematikan status memuat", async () => {
-    vi.mocked(courseApi.getCourses).mockRejectedValue(new Error("gagal"));
+  it("loadContent: sukses mengisi, gagal menjadi null", async () => {
+    vi.mocked(api.getContent).mockResolvedValue(ok({ course_content: makeContent() }));
+    await store.loadContent(100);
+    expect(get(store.content)?.id).toBe(100);
+    expect(get(store.isContentLoading)).toBe(false);
 
-    await expect(fetchCourses()).rejects.toThrow("gagal");
-    expect(get(isCoursesLoading)).toBe(false);
-  });
-
-  it("fetchCourseDetail menyalakan status memuat kecuali mode silent", async () => {
-    const states: boolean[] = [];
-    const unsubscribe = isDetailLoading.subscribe((v) => states.push(v));
-
-    await fetchCourseDetail(5);
-    expect(states).toContain(true);
-    expect(get(courseDetail)).toBe(detail);
-
-    states.length = 0;
-    await fetchCourseDetail(5, true);
-    expect(states).not.toContain(true);
-
-    unsubscribe();
-  });
-
-  it("fetchCourseDetail melempar ulang error dan mematikan status memuat", async () => {
-    vi.mocked(courseApi.getCourseById).mockRejectedValue(new Error("gagal"));
-
-    await expect(fetchCourseDetail(5)).rejects.toThrow("gagal");
-    expect(get(isDetailLoading)).toBe(false);
-  });
-
-  it("fetchCourseContent mengisi materi", async () => {
-    await fetchCourseContent(9);
-
-    expect(courseApi.getContentById).toHaveBeenCalledWith(9);
-    expect(get(courseContent)).toBe(content);
-    expect(get(isContentLoading)).toBe(false);
-  });
-
-  it("fetchCourseContent melempar ulang error dan mematikan status memuat", async () => {
-    vi.mocked(courseApi.getContentById).mockRejectedValue(new Error("gagal"));
-
-    await expect(fetchCourseContent(9)).rejects.toThrow("gagal");
-    expect(get(isContentLoading)).toBe(false);
+    vi.mocked(api.getContent).mockResolvedValue(fail());
+    await store.loadContent(100);
+    expect(get(store.content)).toBeNull();
   });
 });
 
-describe("kursus", () => {
-  it("addCourse tanpa sampul hanya membuat kursus dan memuat ulang daftar", async () => {
-    await addCourse(payload);
+describe("mutasi", () => {
+  const file = new File(["x"], "c.png");
 
-    expect(courseApi.addCourse).toHaveBeenCalledWith(payload);
-    expect(courseApi.changeCover).not.toHaveBeenCalled();
-    expect(courseApi.getCourses).toHaveBeenCalledTimes(1);
-    expect(get(isCourseChanged)).toBe(true);
-    expect(get(isCoverChanged)).toBe(false);
-  });
+  // [nama, pemanggil, fungsi API, argumen API, bendera]
+  const cases: [string, () => Promise<unknown>, keyof typeof api, unknown[], keyof typeof store][] = [
+    ["addCourse", () => store.addCourse("T", "D"), "postCourse", ["T", "D"], "isAdding"],
+    ["changeCourse", () => store.changeCourse(1, "T", "D"), "putCourse", [1, "T", "D"], "isChanging"],
+    ["changeCover", () => store.changeCover(1, file), "postCover", [1, file], "isChangingCover"],
+    ["removeCourse", () => store.removeCourse(1), "deleteCourse", [1], "isDeleting"],
+    ["removeAllCourses", () => store.removeAllCourses(), "deleteAllCourses", [], "isDeletingAll"],
+    ["joinCourse", () => store.joinCourse(1), "postStudent", [1], "isStudentMutating"],
+    ["leaveCourse", () => store.leaveCourse(1), "deleteStudent", [1], "isStudentMutating"],
+    ["rateCourse", () => store.rateCourse(1, 5, "c"), "putRating", [1, 5, "c"], "isRating"],
+    ["addContent", () => store.addContent(1, "T", "yt"), "postContent", [1, "T", "yt"], "isContentMutating"],
+    ["changeContent", () => store.changeContent(2, "T", "yt"), "putContent", [2, "T", "yt"], "isContentMutating"],
+    ["removeContent", () => store.removeContent(2), "deleteContent", [2], "isContentMutating"],
+    ["setLearnStatus", () => store.setLearnStatus(2, 1), "postLearn", [2, 1], "isContentMutating"],
+  ];
 
-  it("addCourse dengan sampul mengunggah ke kursus terbaru berjudul sama", async () => {
-    const file = new File(["x"], "cover.png");
-    vi.mocked(courseApi.getCourses).mockResolvedValueOnce([
-      makeCourse(1, "T"),
-      makeCourse(3, "T"),
-      makeCourse(2, "Lain"),
-    ]);
-
-    await addCourse(payload, file);
-
-    expect(courseApi.getCourses).toHaveBeenNthCalledWith(1, true);
-    expect(courseApi.changeCover).toHaveBeenCalledWith(3, file);
-    expect(get(isCoverChanged)).toBe(true);
-    expect(get(isCourseChanged)).toBe(true);
-  });
-
-  it("addCourse dengan sampul tidak mengunggah bila kursusnya tidak ditemukan", async () => {
-    const file = new File(["x"], "cover.png");
-    vi.mocked(courseApi.getCourses).mockResolvedValueOnce([]);
-
-    await addCourse(payload, file);
-
-    expect(courseApi.changeCover).not.toHaveBeenCalled();
-    expect(get(isCoverChanged)).toBe(false);
-    expect(get(isCourseChanged)).toBe(true);
-  });
-
-  it("updateCourse menaikkan bendera dan memuat ulang detail", async () => {
-    await updateCourse(5, payload);
-
-    expect(courseApi.updateCourse).toHaveBeenCalledWith(5, payload);
-    expect(get(isCourseChanged)).toBe(true);
-    expect(get(courseDetail)).toBe(detail);
-  });
-
-  it("changeCover menaikkan bendera sampul", async () => {
-    const file = new File(["x"], "cover.png");
-    await changeCover(5, file);
-
-    expect(courseApi.changeCover).toHaveBeenCalledWith(5, file);
-    expect(get(isCoverChanged)).toBe(true);
-    expect(courseApi.getCourseById).toHaveBeenCalledWith(5);
-  });
-
-  it("deleteCourse dan deleteAllCourses memuat ulang daftar", async () => {
-    await deleteCourse(5);
-    expect(courseApi.deleteCourse).toHaveBeenCalledWith(5);
-    expect(get(isCourseChanged)).toBe(true);
-
-    isCourseChanged.set(false);
-    await deleteAllCourses();
-    expect(courseApi.deleteAllCourses).toHaveBeenCalled();
-    expect(get(isCourseChanged)).toBe(true);
-    expect(courseApi.getCourses).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("peserta dan rating", () => {
-  it("joinCourse dan leaveCourse menaikkan bendera peserta", async () => {
-    await joinCourse(5);
-    expect(courseApi.joinCourse).toHaveBeenCalledWith(5);
-    expect(get(isStudentChanged)).toBe(true);
-
-    isStudentChanged.set(false);
-    await leaveCourse(5);
-    expect(courseApi.leaveCourse).toHaveBeenCalledWith(5);
-    expect(get(isStudentChanged)).toBe(true);
-  });
-
-  it("changeRating menaikkan bendera rating", async () => {
-    const rating = { ratings: 5 as const, comment: "Mantap" };
-    await changeRating(5, rating);
-
-    expect(courseApi.changeRating).toHaveBeenCalledWith(5, rating);
-    expect(get(isRatingChanged)).toBe(true);
-  });
-});
-
-describe("konten", () => {
-  it("addContent, updateContent, dan deleteContent menaikkan bendera konten", async () => {
-    await addContent(5, contentPayload);
-    expect(courseApi.addContent).toHaveBeenCalledWith(5, contentPayload);
-    expect(get(isContentChanged)).toBe(true);
-
-    isContentChanged.set(false);
-    await updateContent(5, 9, contentPayload);
-    expect(courseApi.updateContent).toHaveBeenCalledWith(9, contentPayload);
-    expect(get(isContentChanged)).toBe(true);
-
-    isContentChanged.set(false);
-    await deleteContent(5, 9);
-    expect(courseApi.deleteContent).toHaveBeenCalledWith(9);
-    expect(get(isContentChanged)).toBe(true);
-    expect(courseApi.getCourseById).toHaveBeenCalledTimes(3);
-  });
-
-  it("changeContentStatus memuat ulang materi", async () => {
-    await changeContentStatus(9, 1);
-
-    expect(courseApi.changeContentStatus).toHaveBeenCalledWith(9, 1);
-    expect(get(isContentChanged)).toBe(true);
-    expect(get(courseContent)).toBe(content);
-  });
-});
-
-describe("utilitas", () => {
-  it("resetMutationFlags mematikan semua bendera", () => {
-    [
-      isCourseChanged,
-      isCoverChanged,
-      isStudentChanged,
-      isRatingChanged,
-      isContentChanged,
-    ].forEach((flag) => flag.set(true));
-
-    resetMutationFlags();
-
-    expect(get(isCourseChanged)).toBe(false);
-    expect(get(isCoverChanged)).toBe(false);
-    expect(get(isStudentChanged)).toBe(false);
-    expect(get(isRatingChanged)).toBe(false);
-    expect(get(isContentChanged)).toBe(false);
-  });
-
-  it("resetCoursesState mengosongkan data dan filter", async () => {
-    await fetchCourses(true);
-    courseDetail.set(detail);
-    courseContent.set(content);
-    isCourseChanged.set(true);
-
-    resetCoursesState();
-
-    expect(get(courses)).toEqual([]);
-    expect(get(courseDetail)).toBeNull();
-    expect(get(courseContent)).toBeNull();
-    expect(get(isCourseChanged)).toBe(false);
-
-    await fetchCourses();
-    expect(courseApi.getCourses).toHaveBeenLastCalledWith(false);
-  });
-
-  it("getCoursesSnapshot membaca nilai saat ini", () => {
-    const list = [makeCourse(1)];
-    courses.set(list);
-    expect(getCoursesSnapshot()).toBe(list);
+  it.each(cases)("%s memanggil API dan menurunkan bendera", async (_name, call, apiName, args, flag) => {
+    let during = false;
+    vi.mocked(api[apiName] as any).mockImplementation(async () => {
+      during = get(store[flag] as any);
+      return ok();
+    });
+    const response = (await call()) as ApiResponse;
+    expect(response.status).toBe("success");
+    expect(api[apiName]).toHaveBeenCalledWith(...args);
+    expect(during).toBe(true);
+    expect(get(store[flag] as any)).toBe(false);
   });
 });

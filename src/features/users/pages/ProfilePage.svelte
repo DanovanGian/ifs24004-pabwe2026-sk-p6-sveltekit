@@ -1,161 +1,149 @@
 <script lang="ts">
-  import { userApi } from "../api/userApi";
-  import { authProfile } from "../../auth/states/authStore";
-  import Avatar from "../../common/components/Avatar.svelte";
+  import { useInput } from "../../../hooks/useInput";
   import {
-    showErrorDialog,
-    showSuccessDialog,
+    getPhotoUrl,
+    runWithFeedback,
+    showWarningDialog,
   } from "../../../helpers/toolsHelper";
+  import { authProfile } from "../../auth/states/authStore";
+  import {
+    isPasswordSaving,
+    isPhotoSaving,
+    isProfileSaving,
+    updatePassword,
+    updatePhoto,
+    updateProfile,
+  } from "../states/usersStore";
 
-  let name = $state("");
-  let email = $state("");
-  let savingProfile = $state(false);
+  // Layout memastikan profil sudah dimuat sebelum halaman ini tampil.
+  const { value: name } = useInput($authProfile.name);
+  const { value: email } = useInput($authProfile.email);
+  const { value: currentPassword, reset: resetCurrent } = useInput("");
+  const { value: newPassword, reset: resetNew } = useInput("");
+  const { value: confirmation, reset: resetConfirmation } = useInput("");
 
-  let password = $state("");
-  let newPassword = $state("");
-  let confirmPassword = $state("");
-  let savingPassword = $state(false);
+  let photoFile: File | undefined = $state();
 
-  let uploading = $state(false);
-
-  // Isi form saat profil tersedia (profil bisa tiba setelah halaman tampil).
-  $effect(() => {
-    if ($authProfile) {
-      name = $authProfile.name;
-      email = $authProfile.email;
-    }
-  });
-
-  async function handleUpdateProfile(event: SubmitEvent) {
-    event.preventDefault();
-    savingProfile = true;
-    try {
-      const user = await userApi.updateProfile({ name, email });
-      authProfile.set(user);
-      await showSuccessDialog("Profil berhasil diperbarui");
-    } catch (error) {
-      showErrorDialog((error as Error).message);
-    } finally {
-      savingProfile = false;
-    }
+  function handleFile(event: Event) {
+    photoFile = (event.currentTarget as HTMLInputElement).files[0];
   }
 
-  async function handlePhotoChange(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
-    uploading = true;
-    try {
-      await userApi.changePhoto(file);
-      authProfile.set(await userApi.getProfile());
-      await showSuccessDialog("Foto profil berhasil diperbarui");
-    } catch (error) {
-      showErrorDialog((error as Error).message);
-    } finally {
-      uploading = false;
-      input.value = "";
-    }
+  async function saveProfile(event: SubmitEvent) {
+    event.preventDefault();
+    await runWithFeedback(() => updateProfile($name, $email), () => {});
   }
 
-  async function handleChangePassword(event: SubmitEvent) {
+  async function savePhoto(event: SubmitEvent) {
     event.preventDefault();
-    savingPassword = true;
-    try {
-      await userApi.changePassword({
-        password,
-        new_password: newPassword,
-        new_password_confirmation: confirmPassword,
-      });
-      password = newPassword = confirmPassword = "";
-      await showSuccessDialog("Kata sandi berhasil diubah");
-    } catch (error) {
-      showErrorDialog((error as Error).message);
-    } finally {
-      savingPassword = false;
+    if (!photoFile) {
+      await showWarningDialog("Pilih foto terlebih dahulu.");
+      return;
     }
+    await runWithFeedback(() => updatePhoto(photoFile), () => {});
+  }
+
+  function clearPasswords() {
+    resetCurrent();
+    resetNew();
+    resetConfirmation();
+  }
+
+  async function savePassword(event: SubmitEvent) {
+    event.preventDefault();
+    await runWithFeedback(
+      () => updatePassword($currentPassword, $newPassword, $confirmation),
+      clearPasswords,
+    );
   }
 
   const inputClass =
-    "w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200";
+    "w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none";
 </script>
 
-<h1 class="mb-6 text-2xl font-extrabold text-slate-900">Profil</h1>
-
-<div class="grid gap-6 lg:grid-cols-2">
-  <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-    <div class="mb-6 flex items-center gap-4">
-      <Avatar
-        name={$authProfile?.name}
-        photo={$authProfile?.photo}
-        class="h-20 w-20 text-2xl"
-      />
-      <div>
-        <label
-          class="cursor-pointer rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-100"
-        >
-          {uploading ? "Mengunggah..." : "Ganti foto"}
-          <input
-            type="file"
-            accept="image/*"
-            class="hidden"
-            disabled={uploading}
-            onchange={handlePhotoChange}
-          />
-        </label>
-      </div>
+<div class="space-y-8">
+  <div class="flex items-center gap-5">
+    <img
+      src={getPhotoUrl($authProfile.photo, $authProfile.name)}
+      alt="Foto profil"
+      width="80"
+      height="80"
+      decoding="async"
+      class="h-20 w-20 rounded-full object-cover"
+    />
+    <div>
+      <h1 class="text-2xl font-extrabold">{$authProfile.name}</h1>
+      <p class="text-slate-600">{$authProfile.email}</p>
     </div>
+  </div>
 
-    <form onsubmit={handleUpdateProfile} class="space-y-4">
+  <section class="max-w-xl rounded-2xl bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-bold">Ubah Data</h2>
+    <form class="space-y-4" onsubmit={saveProfile} novalidate>
       <div>
-        <label for="p-name" class="mb-1 block text-sm font-medium text-slate-700">
-          Nama
-        </label>
-        <input id="p-name" type="text" required bind:value={name} class={inputClass} />
+        <label for="profile-name" class="mb-1 block text-sm font-medium">Nama</label>
+        <input name="name" id="profile-name" type="text" bind:value={$name} class={inputClass} />
       </div>
       <div>
-        <label for="p-email" class="mb-1 block text-sm font-medium text-slate-700">
-          Email
-        </label>
-        <input id="p-email" type="email" required bind:value={email} class={inputClass} />
+        <label for="profile-email" class="mb-1 block text-sm font-medium">Email</label>
+        <input name="email" id="profile-email" type="email" bind:value={$email} class={inputClass} />
       </div>
       <button
         type="submit"
-        disabled={savingProfile}
-        class="rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+        disabled={$isProfileSaving}
+        class="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
       >
-        {savingProfile ? "Menyimpan..." : "Simpan"}
+        Simpan
       </button>
     </form>
   </section>
 
-  <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-    <h2 class="mb-4 text-lg font-bold text-slate-900">Ubah kata sandi</h2>
-    <form onsubmit={handleChangePassword} class="space-y-4">
+  <section class="max-w-xl rounded-2xl bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-bold">Ubah Foto</h2>
+    <form class="space-y-4" onsubmit={savePhoto} novalidate>
+      <input name="photo"
+        type="file"
+        accept="image/*"
+        aria-label="Berkas foto"
+        onchange={handleFile}
+        class={inputClass}
+      />
+      <button
+        type="submit"
+        disabled={$isPhotoSaving}
+        class="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
+      >
+        Unggah Foto
+      </button>
+    </form>
+  </section>
+
+  <section class="max-w-xl rounded-2xl bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-bold">Ubah Kata Sandi</h2>
+    <form class="space-y-4" onsubmit={savePassword} novalidate>
       <div>
-        <label for="pw-old" class="mb-1 block text-sm font-medium text-slate-700">
-          Kata sandi saat ini
+        <label for="current-password" class="mb-1 block text-sm font-medium">
+          Kata Sandi Saat Ini
         </label>
-        <input id="pw-old" type="password" required bind:value={password} class={inputClass} />
+        <input name="current_password" id="current-password" type="password" bind:value={$currentPassword} class={inputClass} />
       </div>
       <div>
-        <label for="pw-new" class="mb-1 block text-sm font-medium text-slate-700">
-          Kata sandi baru
+        <label for="new-password" class="mb-1 block text-sm font-medium">
+          Kata Sandi Baru
         </label>
-        <input id="pw-new" type="password" required bind:value={newPassword} class={inputClass} />
+        <input name="new_password" id="new-password" type="password" bind:value={$newPassword} class={inputClass} />
       </div>
       <div>
-        <label for="pw-confirm" class="mb-1 block text-sm font-medium text-slate-700">
-          Konfirmasi kata sandi baru
+        <label for="confirm-password" class="mb-1 block text-sm font-medium">
+          Konfirmasi Kata Sandi Baru
         </label>
-        <input id="pw-confirm" type="password" required bind:value={confirmPassword} class={inputClass} />
+        <input name="password_confirmation" id="confirm-password" type="password" bind:value={$confirmation} class={inputClass} />
       </div>
       <button
         type="submit"
-        disabled={savingPassword}
-        class="rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+        disabled={$isPasswordSaving}
+        class="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
       >
-        {savingPassword ? "Menyimpan..." : "Ubah kata sandi"}
+        Ubah Kata Sandi
       </button>
     </form>
   </section>

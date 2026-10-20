@@ -1,61 +1,31 @@
-import { apiHelper } from "../../../helpers/apiHelper";
+import { apiRequest } from "../../../helpers/apiHelper";
 
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  email_verified_at: string | null;
-  photo: string;
-  created_at: string;
-  updated_at: string;
+export function getUsers() {
+  return apiRequest<{ users: User[] }>("GET", "/users");
 }
 
-export interface UpdateProfilePayload {
-  name: string;
-  email: string;
+export function getMe() {
+  return apiRequest<{ user: User }>("GET", "/users/me");
 }
 
-export interface ChangePasswordPayload {
-  password: string;
-  new_password: string;
-  new_password_confirmation: string;
+export function putMe(name: string, email: string) {
+  return apiRequest<{ user: User }>("PUT", "/users/me", { name, email });
 }
 
-export const userApi = {
-  async getUsers(): Promise<User[]> {
-    const response = await apiHelper<{ users: User[] }>("/users");
-    return response.data!.users;
-  },
+export function postPhoto(file: File) {
+  const form = new FormData();
+  form.append("photo", file);
+  return apiRequest("POST", "/users/me/photo", form);
+}
 
-  async getUserById(id: number | string): Promise<User> {
-    const response = await apiHelper<{ user: User }>(`/users/${id}`);
-    return response.data!.user;
-  },
-
-  async getProfile(): Promise<User> {
-    const response = await apiHelper<{ user: User }>("/users/me");
-    return response.data!.user;
-  },
-
-  async updateProfile(payload: UpdateProfilePayload): Promise<User> {
-    const response = await apiHelper<{ user: User }>("/users/me", {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-    return response.data!.user;
-  },
-
-  // Harus POST (bukan PUT) agar file terbaca di sisi server.
-  changePhoto(photo: File) {
-    const formData = new FormData();
-    formData.append("photo", photo);
-    return apiHelper("/users/me/photo", { method: "POST", body: formData });
-  },
-
-  changePassword(payload: ChangePasswordPayload) {
-    return apiHelper("/users/password", {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-  },
-};
+export function putPassword(
+  password: string,
+  newPassword: string,
+  confirmation: string,
+) {
+  return apiRequest("PUT", "/users/password", {
+    password,
+    new_password: newPassword,
+    new_password_confirmation: confirmation,
+  });
+}

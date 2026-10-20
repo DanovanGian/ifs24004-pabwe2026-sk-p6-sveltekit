@@ -1,201 +1,114 @@
-import { writable, get } from "svelte/store";
+import { writable } from "svelte/store";
+import { isSuccess } from "../../../helpers/apiHelper";
+import { withFlag } from "../../../helpers/storeHelper";
 import {
-  courseApi,
-  type Course,
-  type CourseDetail,
-  type CourseContent,
-  type CoursePayload,
-  type ContentPayload,
-  type RatingPayload,
+  deleteAllCourses,
+  deleteContent,
+  deleteCourse,
+  deleteStudent,
+  getContent,
+  getCourse,
+  getCourses,
+  postContent,
+  postCourse,
+  postCover,
+  postLearn,
+  postStudent,
+  putContent,
+  putCourse,
+  putRating,
 } from "../api/courseApi";
 
-// ---- Data ----
+type Id = number | string;
+
+// koleksi, detail, dan konten
 export const courses = writable<Course[]>([]);
-export const courseDetail = writable<CourseDetail | null>(null);
-export const courseContent = writable<CourseContent | null>(null);
+export const course = writable<CourseDetail | null>(null);
+export const content = writable<CourseContent | null>(null);
 
-// ---- Status pemuatan ----
-export const isCoursesLoading = writable<boolean>(false);
-export const isDetailLoading = writable<boolean>(false);
-export const isContentLoading = writable<boolean>(false);
+// bendera pemuatan
+export const isCoursesLoading = writable(false);
+export const isCourseLoading = writable(false);
+export const isContentLoading = writable(false);
 
-// ---- Bendera mutasi: true setelah operasi tulis berhasil ----
-export const isCourseChanged = writable<boolean>(false);
-export const isCoverChanged = writable<boolean>(false);
-export const isStudentChanged = writable<boolean>(false);
-export const isRatingChanged = writable<boolean>(false);
-export const isContentChanged = writable<boolean>(false);
+// bendera mutasi
+export const isAdding = writable(false);
+export const isChanging = writable(false);
+export const isChangingCover = writable(false);
+export const isDeleting = writable(false);
+export const isDeletingAll = writable(false);
+export const isStudentMutating = writable(false);
+export const isRating = writable(false);
+export const isContentMutating = writable(false);
 
-export function resetMutationFlags(): void {
-  isCourseChanged.set(false);
-  isCoverChanged.set(false);
-  isStudentChanged.set(false);
-  isRatingChanged.set(false);
-  isContentChanged.set(false);
+export function loadCourses(onlyMine: boolean) {
+  return withFlag(isCoursesLoading, async () => {
+    const response = await getCourses(onlyMine);
+    courses.set(isSuccess(response) ? response.data.courses : []);
+    return response;
+  });
 }
 
-// Mengingat filter terakhir supaya muat ulang setelah mutasi memakai filter yang sama.
-let lastOnlyMine = false;
-
-// ---- Memuat data ----
-export async function fetchCourses(onlyMine = lastOnlyMine): Promise<void> {
-  lastOnlyMine = onlyMine;
-  isCoursesLoading.set(true);
-  try {
-    courses.set(await courseApi.getCourses(onlyMine));
-  } finally {
-    isCoursesLoading.set(false);
-  }
+export function loadCourse(id: Id) {
+  return withFlag(isCourseLoading, async () => {
+    const response = await getCourse(id);
+    course.set(isSuccess(response) ? response.data.course : null);
+    return response;
+  });
 }
 
-export async function fetchCourseDetail(
-  id: number | string,
-  silent = false
-): Promise<void> {
-  if (!silent) isDetailLoading.set(true);
-  try {
-    courseDetail.set(await courseApi.getCourseById(id));
-  } finally {
-    isDetailLoading.set(false);
-  }
+export function loadContent(id: Id) {
+  return withFlag(isContentLoading, async () => {
+    const response = await getContent(id);
+    content.set(isSuccess(response) ? response.data.course_content : null);
+    return response;
+  });
 }
 
-export async function fetchCourseContent(
-  contentId: number | string
-): Promise<void> {
-  isContentLoading.set(true);
-  try {
-    courseContent.set(await courseApi.getContentById(contentId));
-  } finally {
-    isContentLoading.set(false);
-  }
+export function addCourse(title: string, description: string) {
+  return withFlag(isAdding, () => postCourse(title, description));
 }
 
-// ---- Kursus ----
-export async function addCourse(
-  payload: CoursePayload,
-  cover: File | null = null
-): Promise<void> {
-  await courseApi.addCourse(payload);
-
-  if (cover) {
-    // Server tidak mengembalikan id kursus baru: cari kursus milik saya
-    // dengan judul yang sama dan id terbesar (yang paling baru).
-    const mine = await courseApi.getCourses(true);
-    const created = mine
-      .filter((course) => course.title === payload.title)
-      .sort((a, b) => b.id - a.id)[0];
-
-    if (created) {
-      await courseApi.changeCover(created.id, cover);
-      isCoverChanged.set(true);
-    }
-  }
-
-  isCourseChanged.set(true);
-  await fetchCourses();
+export function changeCourse(id: Id, title: string, description: string) {
+  return withFlag(isChanging, () => putCourse(id, title, description));
 }
 
-export async function updateCourse(
-  id: number | string,
-  payload: CoursePayload
-): Promise<void> {
-  await courseApi.updateCourse(id, payload);
-  isCourseChanged.set(true);
-  await fetchCourseDetail(id, true);
+export function changeCover(id: Id, file: File) {
+  return withFlag(isChangingCover, () => postCover(id, file));
 }
 
-export async function changeCover(
-  id: number | string,
-  cover: File
-): Promise<void> {
-  await courseApi.changeCover(id, cover);
-  isCoverChanged.set(true);
-  await fetchCourseDetail(id, true);
+export function removeCourse(id: Id) {
+  return withFlag(isDeleting, () => deleteCourse(id));
 }
 
-export async function deleteCourse(id: number | string): Promise<void> {
-  await courseApi.deleteCourse(id);
-  isCourseChanged.set(true);
-  await fetchCourses();
+export function removeAllCourses() {
+  return withFlag(isDeletingAll, () => deleteAllCourses());
 }
 
-export async function deleteAllCourses(): Promise<void> {
-  await courseApi.deleteAllCourses();
-  isCourseChanged.set(true);
-  await fetchCourses();
+export function joinCourse(id: Id) {
+  return withFlag(isStudentMutating, () => postStudent(id));
 }
 
-// ---- Peserta dan rating ----
-export async function joinCourse(id: number | string): Promise<void> {
-  await courseApi.joinCourse(id);
-  isStudentChanged.set(true);
-  await fetchCourseDetail(id, true);
+export function leaveCourse(id: Id) {
+  return withFlag(isStudentMutating, () => deleteStudent(id));
 }
 
-export async function leaveCourse(id: number | string): Promise<void> {
-  await courseApi.leaveCourse(id);
-  isStudentChanged.set(true);
-  await fetchCourseDetail(id, true);
+export function rateCourse(id: Id, ratings: number, comment: string) {
+  return withFlag(isRating, () => putRating(id, ratings, comment));
 }
 
-export async function changeRating(
-  id: number | string,
-  payload: RatingPayload
-): Promise<void> {
-  await courseApi.changeRating(id, payload);
-  isRatingChanged.set(true);
-  await fetchCourseDetail(id, true);
+export function addContent(courseId: Id, title: string, youtube: string) {
+  return withFlag(isContentMutating, () => postContent(courseId, title, youtube));
 }
 
-// ---- Konten ----
-export async function addContent(
-  courseId: number | string,
-  payload: ContentPayload
-): Promise<void> {
-  await courseApi.addContent(courseId, payload);
-  isContentChanged.set(true);
-  await fetchCourseDetail(courseId, true);
+export function changeContent(id: Id, title: string, youtube: string) {
+  return withFlag(isContentMutating, () => putContent(id, title, youtube));
 }
 
-export async function updateContent(
-  courseId: number | string,
-  contentId: number | string,
-  payload: ContentPayload
-): Promise<void> {
-  await courseApi.updateContent(contentId, payload);
-  isContentChanged.set(true);
-  await fetchCourseDetail(courseId, true);
+export function removeContent(id: Id) {
+  return withFlag(isContentMutating, () => deleteContent(id));
 }
 
-export async function deleteContent(
-  courseId: number | string,
-  contentId: number | string
-): Promise<void> {
-  await courseApi.deleteContent(contentId);
-  isContentChanged.set(true);
-  await fetchCourseDetail(courseId, true);
-}
-
-export async function changeContentStatus(
-  contentId: number | string,
-  status: 0 | 1
-): Promise<void> {
-  await courseApi.changeContentStatus(contentId, status);
-  isContentChanged.set(true);
-  await fetchCourseContent(contentId);
-}
-
-// Dipakai tes dan saat logout agar tidak ada data pengguna lama yang tersisa.
-export function resetCoursesState(): void {
-  courses.set([]);
-  courseDetail.set(null);
-  courseContent.set(null);
-  resetMutationFlags();
-  lastOnlyMine = false;
-}
-
-// Mengekspos nilai saat ini tanpa langganan (berguna di fungsi non-komponen).
-export function getCoursesSnapshot(): Course[] {
-  return get(courses);
+export function setLearnStatus(id: Id, status: 0 | 1) {
+  return withFlag(isContentMutating, () => postLearn(id, status));
 }

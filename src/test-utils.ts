@@ -1,106 +1,138 @@
-import { render } from "@testing-library/svelte";
-import { tick } from "svelte";
 import { page } from "$app/state";
+import { fireEvent, render } from "@testing-library/svelte";
+import type { Component } from "svelte";
+import { authProfile, authToken, isAuthLoading } from "./features/auth/states/authStore";
 import {
-  authProfile,
-  authToken,
-  isAuthenticated,
-  isProfile,
-} from "./features/auth/states/authStore";
-import type { User } from "./features/users/api/userApi";
-import type {
-  Course,
-  CourseContent,
-  CourseDetail,
-} from "./features/courses/api/courseApi";
+  content,
+  course,
+  courses,
+  isAdding,
+  isChanging,
+  isChangingCover,
+  isContentLoading,
+  isContentMutating,
+  isCourseLoading,
+  isCoursesLoading,
+  isDeleting,
+  isDeletingAll,
+  isRating,
+  isStudentMutating,
+} from "./features/courses/states/coursesStore";
+import {
+  isPasswordSaving,
+  isPhotoSaving,
+  isProfileSaving,
+  isUsersLoading,
+  users,
+} from "./features/users/states/usersStore";
 
-export const mockUser: User = {
+export const ok = (data?: unknown, message = "Berhasil") =>
+  ({ status: "success", message, data }) as ApiResponse;
+
+export const fail = (message = "Gagal", data?: unknown) =>
+  ({ status: "fail", message, data }) as ApiResponse;
+
+export const makeUser = (override: Partial<User> = {}): User => ({
   id: 1,
-  name: "Delcom Testing",
-  email: "testing@delcom.org",
+  name: "Budi",
+  email: "budi@del.ac.id",
   email_verified_at: null,
-  photo: "img/profile/1_1709107233.png",
-  created_at: "2024-02-28T04:11:30.000000Z",
-  updated_at: "2024-02-28T04:11:30.000000Z",
-};
+  photo: null,
+  created_at: "2026-10-01T00:00:00Z",
+  updated_at: "2026-10-01T00:00:00Z",
+  ...override,
+});
 
-export function makeCourse(overrides: Partial<Course> = {}): Course {
-  return {
-    id: 1,
-    user_id: 2,
-    title: "Belajar ReactJS",
-    cover: "http://localhost/cover.jpg",
-    description: "Belajar ReactJS dari awal",
-    created_at: "2024-10-06T01:27:37.000000Z",
-    updated_at: "2024-10-06T01:28:31.000000Z",
-    author: { name: "Abdullah Ubaid", photo: "http://localhost/user.png" },
-    students: [3, 4],
-    total_contents: 3,
-    avg_ratings: "4.0000",
-    ...overrides,
-  };
-}
+export const makeCourse = (override: Partial<Course> = {}): Course => ({
+  id: 10,
+  user_id: 1,
+  title: "Belajar Svelte",
+  cover: null,
+  description: "Dasar-dasar Svelte",
+  created_at: "2026-10-01T12:00:00Z",
+  updated_at: "2026-10-01T12:00:00Z",
+  author: { name: "Budi", photo: null },
+  students: [],
+  total_contents: 2,
+  avg_ratings: "4.5000",
+  ...override,
+});
 
-export function makeContent(
-  overrides: Partial<CourseContent> = {}
-): CourseContent {
-  return {
-    id: 9,
-    course_id: 1,
-    title: "Dasar Java",
-    youtube: "https://youtu.be/uHyfQV0kbgo",
-    created_at: "2024-10-06T00:55:15.000000Z",
-    updated_at: "2024-10-06T00:55:15.000000Z",
-    my_status_finished: false,
-    ...overrides,
-  };
-}
+export const makeContent = (override: Partial<CourseContent> = {}): CourseContent => ({
+  id: 100,
+  course_id: 10,
+  title: "Pengantar",
+  youtube: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  created_at: "2026-10-01T12:00:00Z",
+  updated_at: "2026-10-01T12:00:00Z",
+  my_status_finished: false,
+  ...override,
+});
 
-export function makeCourseDetail(
-  overrides: Partial<CourseDetail> = {}
-): CourseDetail {
-  return {
-    ...makeCourse(),
-    contents: [makeContent()],
-    ratings: [{ name: "Budi", ratings: 4, comment: "Keren" }],
-    avg_ratings: "4.00",
-    my_percentage_finished: "33.33",
-    ...overrides,
-  } as CourseDetail;
-}
+export const makeDetail = (override: Partial<CourseDetail> = {}): CourseDetail => ({
+  ...makeCourse(),
+  contents: [makeContent(), makeContent({ id: 101, title: "Komponen", my_status_finished: true })],
+  ratings: [{ name: "Ani", ratings: 5, comment: "Bagus" }],
+  my_percentage_finished: "50.00",
+  ...override,
+});
 
-interface RenderOptions {
-  props?: Record<string, any>;
-  pathname?: string;
-  params?: Record<string, string>;
-  user?: User | null; // null = belum login
-}
-
-// "Provider" di aplikasi ini adalah state global: store auth dan objek page.
-export function renderWithProviders(
-  Component: any,
-  { props = {}, pathname = "/", params = {}, user = mockUser }: RenderOptions = {}
-) {
-  (page as any).url = new URL(pathname, "http://localhost");
-  (page as any).params = params;
-
-  if (user) {
-    authToken.set("test-token");
-    authProfile.set(user);
-    isAuthenticated.set(true);
-    isProfile.set(false);
-  } else {
-    authToken.set(null);
-    authProfile.set(null);
-    isAuthenticated.set(false);
-    isProfile.set(false);
+export function resetStores() {
+  authToken.set(null);
+  authProfile.set(null);
+  courses.set([]);
+  course.set(null);
+  content.set(null);
+  users.set([]);
+  for (const flag of [
+    isAuthLoading,
+    isUsersLoading,
+    isProfileSaving,
+    isPhotoSaving,
+    isPasswordSaving,
+    isCoursesLoading,
+    isCourseLoading,
+    isContentLoading,
+    isAdding,
+    isChanging,
+    isChangingCover,
+    isDeleting,
+    isDeletingAll,
+    isStudentMutating,
+    isRating,
+    isContentMutating,
+  ]) {
+    flag.set(false);
   }
-
-  return render(Component, { props });
 }
 
-// Klik listener Svelte 5 lewat element.click(), lalu tunggu DOM diperbarui.
-export async function click(element: HTMLElement) {
-  element.click();
-  await tick();
+interface ProviderOptions {
+  props?: Record<string, unknown>;
+  token?: string | null;
+  profile?: User | null;
+  path?: string;
+  params?: Record<string, string>;
+}
+
+/** Merender komponen setelah mengatur ulang store, sesi, dan rute palsu. */
+export function renderWithProviders(
+  component: Component<any>,
+  options: ProviderOptions = {},
+) {
+  resetStores();
+  authToken.set(options.token ?? null);
+  authProfile.set(options.profile ?? null);
+  (page as any).url = new URL(`http://localhost${options.path ?? "/"}`);
+  (page as any).params = options.params ?? {};
+  return render(component, { props: options.props ?? {} });
+}
+
+/** Mengirim formulir ke-`index` di dalam container. */
+export async function submitForm(container: HTMLElement, index = 0) {
+  await fireEvent.submit(container.querySelectorAll("form")[index]);
+}
+
+/** Mengetik ke input/textarea (Svelte bind:value mendengar event `input`). */
+export async function typeInto(element: HTMLElement, value: string) {
+  await fireEvent.input(element, { target: { value } });
 }

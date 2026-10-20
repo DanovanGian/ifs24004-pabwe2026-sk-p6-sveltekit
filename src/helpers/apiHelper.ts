@@ -1,4 +1,8 @@
-const TOKEN_KEY = "token";
+const TOKEN_KEY = "access_token";
+
+// Permintaan dikirim ke proxy same-origin (src/routes/api/[...path]/+server.ts),
+// bukan langsung ke Delcom Open API, sehingga browser tidak melakukan CORS.
+export const API_PATH = "/api";
 
 export function getAccessToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -12,39 +16,43 @@ export function removeAccessToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-export interface ApiResponse<T = any> {
-  status: "success" | "fail";
-  message: string;
-  data?: T;
+export function isSuccess(response: ApiResponse): boolean {
+  return response.status === "success";
 }
 
-export async function apiHelper<T = any>(
+/**
+ * Pembungkus fetch ke Delcom Open API (lewat proxy same-origin `/api`).
+ * - header `Authorization: Bearer <token>` dipasang bila token tersedia
+ * - FormData dikirim apa adanya, objek lain dikirim sebagai JSON
+ * - kegagalan jaringan diubah menjadi respons `fail`
+ */
+export async function apiRequest<T = any>(
+  method: string,
   path: string,
-  options: RequestInit = {}
+  payload?: FormData | object,
 ): Promise<ApiResponse<T>> {
-  const headers = new Headers(options.headers);
-  headers.set("Accept", "application/json");
-
+  const headers: Record<string, string> = {};
   const token = getAccessToken();
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+    headers.Authorization = `Bearer ${token}`;
   }
 
-  // Untuk FormData (upload sampul), biarkan browser mengisi Content-Type sendiri.
-  if (options.body && !(options.body instanceof FormData)) {
-    headers.set("Content-Type", "application/json");
+  let body: FormData | string | undefined;
+  if (payload instanceof FormData) {
+    body = payload;
+  } else if (payload) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(payload);
   }
 
-  const response = await fetch(`${DELCOM_BASEURL}${path}`, {
-    ...options,
-    headers,
-  });
-
-  const result = await response.json();
-
-  if (!response.ok || result.status === "fail") {
-    throw new Error(result.message || "Terjadi kesalahan pada server");
+  try {
+    const response = await fetch(`${API_PATH}${path}`, {
+      method,
+      headers,
+      body,
+    });
+    return await response.json();
+  } catch {
+    return { status: "fail", message: "Tidak dapat terhubung ke server." };
   }
-
-  return result;
 }

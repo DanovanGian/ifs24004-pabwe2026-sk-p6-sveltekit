@@ -1,5 +1,9 @@
 <script lang="ts">
-  import LoginForm from "../../../features/auth/components/LoginForm.svelte";
+  import LoginPage from "../../../features/auth/pages/LoginPage.svelte";
 </script>
 
-<LoginForm />
+<svelte:head>
+  <title>Masuk | Delcom Courses</title>
+</svelte:head>
+
+<LoginPage />

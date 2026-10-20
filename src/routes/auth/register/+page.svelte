@@ -1,5 +1,9 @@
 <script lang="ts">
-  import RegisterForm from "../../../features/auth/components/RegisterForm.svelte";
+  import RegisterPage from "../../../features/auth/pages/RegisterPage.svelte";
 </script>
 
-<RegisterForm />
+<svelte:head>
+  <title>Daftar | Delcom Courses</title>
+</svelte:head>
+
+<RegisterPage />

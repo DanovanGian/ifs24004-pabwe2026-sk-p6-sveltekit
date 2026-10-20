@@ -1,44 +1,65 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { userApi, type User } from "../api/userApi";
-  import Avatar from "../../common/components/Avatar.svelte";
-  import { showErrorDialog } from "../../../helpers/toolsHelper";
+  import { Search } from "lucide-svelte";
+  import { getPhotoUrl } from "../../../helpers/toolsHelper";
+  import { isUsersLoading, loadUsers, users } from "../states/usersStore";
 
-  let users = $state<User[]>([]);
-  let loading = $state(true);
+  let query = $state("");
 
-  onMount(async () => {
-    try {
-      users = await userApi.getUsers();
-    } catch (error) {
-      showErrorDialog((error as Error).message);
-    } finally {
-      loading = false;
-    }
+  const keyword = $derived(query.toLowerCase());
+  const filtered = $derived(
+    $users.filter(
+      (user) =>
+        user.name.toLowerCase().includes(keyword) ||
+        user.email.toLowerCase().includes(keyword),
+    ),
+  );
+
+  onMount(() => {
+    loadUsers();
   });
 </script>
 
-<div class="mb-6">
-  <h1 class="text-2xl font-extrabold text-slate-900">Pengguna</h1>
-  <p class="text-sm text-slate-500">Daftar pengguna yang terdaftar di Delcom.</p>
-</div>
-
-{#if loading}
-  <p class="text-slate-500">Memuat data...</p>
-{:else if users.length === 0}
-  <p class="text-slate-500">Belum ada pengguna.</p>
-{:else}
-  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    {#each users as user (user.id)}
-      <div
-        class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
-      >
-        <Avatar name={user.name} photo={user.photo} class="h-12 w-12" />
-        <div class="min-w-0">
-          <p class="truncate font-semibold text-slate-900">{user.name}</p>
-          <p class="truncate text-sm text-slate-500">{user.email}</p>
-        </div>
-      </div>
-    {/each}
+<div class="space-y-6">
+  <div>
+    <h1 class="text-2xl font-extrabold">Pengguna</h1>
+    <p class="text-slate-600">Direktori pengguna Delcom Courses.</p>
   </div>
-{/if}
+
+  <div class="relative max-w-md">
+    <Search class="absolute top-3.5 left-3 h-4 w-4 text-slate-400" />
+    <input name="query"
+      type="search"
+      aria-label="Cari pengguna"
+      placeholder="Cari nama atau email"
+      bind:value={query}
+      class="w-full rounded-xl border border-slate-300 py-3 pr-4 pl-9"
+    />
+  </div>
+
+  {#if $isUsersLoading}
+    <p class="text-slate-600">Memuat pengguna...</p>
+  {:else if filtered.length === 0}
+    <p class="text-slate-600">Pengguna tidak ditemukan.</p>
+  {:else}
+    <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {#each filtered as user (user.id)}
+        <li class="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm">
+          <img
+            src={getPhotoUrl(user.photo, user.name)}
+            alt={user.name}
+            width="48"
+            height="48"
+            loading="lazy"
+            decoding="async"
+            class="h-12 w-12 rounded-full object-cover"
+          />
+          <div class="min-w-0">
+            <p class="truncate font-semibold">{user.name}</p>
+            <p class="truncate text-sm text-slate-600">{user.email}</p>
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+</div>

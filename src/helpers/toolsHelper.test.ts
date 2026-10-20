@@ -1,100 +1,136 @@
-import { describe, it, expect, vi } from "vitest";
 import Swal from "sweetalert2";
+import { describe, expect, it, vi } from "vitest";
 import {
-  cn,
   formatDate,
+  formatRating,
+  getAssetUrl,
+  getCoverUrl,
+  getErrorMessage,
+  getInitials,
   getPhotoUrl,
   getYoutubeEmbedUrl,
+  runWithFeedback,
   showConfirmDialog,
   showErrorDialog,
   showSuccessDialog,
+  showWarningDialog,
 } from "./toolsHelper";
 
-vi.mock("sweetalert2", () => ({
-  default: { fire: vi.fn() },
-}));
+const origin = new URL(DELCOM_BASEURL).origin;
 
-describe("cn", () => {
-  it("menggabungkan class dan mengabaikan nilai falsy", () => {
-    expect(cn("a", false && "b", "c")).toBe("a c");
+describe("dialog", () => {
+  it("menampilkan dialog sukses, error, dan peringatan", () => {
+    showSuccessDialog("a");
+    showErrorDialog("b");
+    showWarningDialog("c");
+    const calls = vi.mocked(Swal.fire).mock.calls.map((c) => c[0]);
+    expect(calls[0]).toMatchObject({ icon: "success", text: "a" });
+    expect(calls[1]).toMatchObject({ icon: "error", text: "b" });
+    expect(calls[2]).toMatchObject({ icon: "warning", text: "c" });
   });
 
-  it("menyelesaikan konflik class Tailwind", () => {
-    expect(cn("p-2", "p-4")).toBe("p-4");
+  it("showConfirmDialog mengembalikan pilihan pengguna", async () => {
+    expect(await showConfirmDialog("yakin?")).toBe(true);
+    vi.mocked(Swal.fire).mockResolvedValueOnce({ isConfirmed: false } as never);
+    expect(await showConfirmDialog("yakin?")).toBe(false);
+    expect(Swal.fire).toHaveBeenCalledWith(
+      expect.objectContaining({ icon: "question", showCancelButton: true }),
+    );
   });
 });
 
 describe("formatDate", () => {
-  it("memformat tanggal ke bahasa Indonesia", () => {
-    expect(formatDate("2024-10-06T12:00:00Z")).toContain("2024");
+  it("memakai format Indonesia", () => {
+    const text = formatDate("2026-10-14T12:00:00Z");
+    expect(text).toContain("Oktober");
+    expect(text).toContain("2026");
   });
 });
 
-describe("getPhotoUrl", () => {
-  it("mengembalikan null bila foto kosong", () => {
-    expect(getPhotoUrl(null)).toBeNull();
-    expect(getPhotoUrl(undefined)).toBeNull();
-    expect(getPhotoUrl("")).toBeNull();
+describe("getErrorMessage", () => {
+  it("menggabungkan pesan dengan detail validasi", () => {
+    expect(
+      getErrorMessage({ status: "fail", message: "Data tidak valid", data: { title: ["wajib", "pendek"] } }),
+    ).toBe("Data tidak valid\nwajib\npendek");
   });
 
-  it("mengembalikan URL penuh apa adanya", () => {
-    expect(getPhotoUrl("https://example.com/a.png")).toBe(
-      "https://example.com/a.png"
-    );
+  it("hanya pesan bila tidak ada data atau data kosong", () => {
+    expect(getErrorMessage({ status: "fail", message: "Gagal" })).toBe("Gagal");
+    expect(getErrorMessage({ status: "fail", message: "Gagal", data: {} })).toBe("Gagal");
+  });
+});
+
+describe("URL aset", () => {
+  it("getAssetUrl: URL absolut dibiarkan, path relatif diberi origin", () => {
+    expect(getAssetUrl("https://x.test/a.png")).toBe("https://x.test/a.png");
+    expect(getAssetUrl("storage/a.png")).toBe(`${origin}/storage/a.png`);
+    expect(getAssetUrl("/storage/a.png")).toBe(`${origin}/storage/a.png`);
   });
 
-  it("menyusun URL dari path relatif, dengan atau tanpa garis miring awal", () => {
-    expect(new URL(getPhotoUrl("img/profile/1.png")!).pathname).toBe(
-      "/img/profile/1.png"
-    );
-    expect(new URL(getPhotoUrl("/img/profile/1.png")!).pathname).toBe(
-      "/img/profile/1.png"
-    );
+  it("getPhotoUrl: memakai foto atau avatar inisial", () => {
+    expect(getPhotoUrl("https://x.test/p.png", "Budi")).toBe("https://x.test/p.png");
+    const avatar = getPhotoUrl(null, "Budi Santoso");
+    expect(avatar.startsWith("data:image/svg+xml,")).toBe(true);
+    expect(decodeURIComponent(avatar)).toContain(">BS</text>");
+  });
+
+  it("getInitials: maksimal dua huruf, simbol dibuang, kosong menjadi ?", () => {
+    expect(getInitials("budi santoso wijaya")).toBe("BS");
+    expect(getInitials("Budi")).toBe("B");
+    expect(getInitials("  ")).toBe("?");
+    expect(getInitials("&<")).toBe("?");
+  });
+
+  it("getCoverUrl: memakai sampul atau logo bawaan", () => {
+    expect(getCoverUrl("https://x.test/c.png")).toBe("https://x.test/c.png");
+    expect(getCoverUrl(null)).toBe("/logo.svg");
+  });
+});
+
+describe("formatRating", () => {
+  it("membulatkan satu desimal atau menampilkan teks kosong", () => {
+    expect(formatRating("4.0000")).toBe("4.0");
+    expect(formatRating("3.666")).toBe("3.7");
+    expect(formatRating(null)).toBe("Belum ada rating");
   });
 });
 
 describe("getYoutubeEmbedUrl", () => {
-  const embed = "https://www.youtube.com/embed/abc123";
-
-  it("mendukung youtu.be", () => {
-    expect(getYoutubeEmbedUrl("https://youtu.be/abc123")).toBe(embed);
+  const id = "dQw4w9WgXcQ";
+  it.each([
+    `https://www.youtube.com/watch?v=${id}`,
+    `https://youtu.be/${id}`,
+    `https://www.youtube.com/embed/${id}`,
+    `https://www.youtube.com/shorts/${id}`,
+  ])("mengenali %s", (url) => {
+    expect(getYoutubeEmbedUrl(url)).toBe(`https://www.youtube.com/embed/${id}`);
   });
 
-  it("mendukung youtube.com/watch?v=", () => {
-    expect(getYoutubeEmbedUrl("https://www.youtube.com/watch?v=abc123")).toBe(embed);
-    expect(getYoutubeEmbedUrl("https://m.youtube.com/watch?v=abc123")).toBe(embed);
-  });
-
-  it("mendukung /embed/ dan /shorts/", () => {
-    expect(getYoutubeEmbedUrl("https://youtube.com/embed/abc123")).toBe(embed);
-    expect(getYoutubeEmbedUrl("https://youtube.com/shorts/abc123")).toBe(embed);
-  });
-
-  it("mengembalikan null untuk tautan yang tidak dikenali", () => {
-    expect(getYoutubeEmbedUrl("https://youtube.com/watch")).toBeNull();
-    expect(getYoutubeEmbedUrl("https://youtube.com/channel/xyz")).toBeNull();
-    expect(getYoutubeEmbedUrl("https://example.com/video")).toBeNull();
-    expect(getYoutubeEmbedUrl("bukan url")).toBeNull();
+  it("mengembalikan null untuk tautan lain", () => {
+    expect(getYoutubeEmbedUrl("https://contoh.com/video")).toBeNull();
   });
 });
 
-describe("dialog", () => {
-  it("showSuccessDialog dan showErrorDialog memanggil Swal.fire", async () => {
-    await showSuccessDialog("ok");
-    await showErrorDialog("gagal");
-    expect(Swal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({ icon: "success", text: "ok" })
+describe("runWithFeedback", () => {
+  it("sukses: dialog sukses lalu onSuccess dipanggil", async () => {
+    const onSuccess = vi.fn();
+    const result = await runWithFeedback(
+      async () => ({ status: "success", message: "Tersimpan" }),
+      onSuccess,
     );
-    expect(Swal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({ icon: "error", text: "gagal" })
-    );
+    expect(result).toBe(true);
+    expect(onSuccess).toHaveBeenCalledOnce();
+    expect(Swal.fire).toHaveBeenCalledWith(expect.objectContaining({ icon: "success", text: "Tersimpan" }));
   });
 
-  it("showConfirmDialog mengembalikan pilihan pengguna", async () => {
-    vi.mocked(Swal.fire).mockResolvedValueOnce({ isConfirmed: true } as any);
-    expect(await showConfirmDialog("Judul", "Teks")).toBe(true);
-
-    vi.mocked(Swal.fire).mockResolvedValueOnce({ isConfirmed: false } as any);
-    expect(await showConfirmDialog("Judul", "Teks")).toBe(false);
+  it("gagal: dialog error dan onSuccess tidak dipanggil", async () => {
+    const onSuccess = vi.fn();
+    const result = await runWithFeedback(
+      async () => ({ status: "fail", message: "Ditolak" }),
+      onSuccess,
+    );
+    expect(result).toBe(false);
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(Swal.fire).toHaveBeenCalledWith(expect.objectContaining({ icon: "error", text: "Ditolak" }));
   });
 });

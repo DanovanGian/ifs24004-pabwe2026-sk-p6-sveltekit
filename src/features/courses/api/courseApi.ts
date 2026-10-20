@@ -1,154 +1,77 @@
-import { apiHelper } from "../../../helpers/apiHelper";
+import { apiRequest } from "../../../helpers/apiHelper";
 
-export interface CourseAuthor {
-  name: string;
-  photo: string;
+type Id = number | string;
+
+export function getCourses(onlyMine: boolean) {
+  return apiRequest<{ courses: Course[] }>(
+    "GET",
+    onlyMine ? "/courses?is_me=1" : "/courses",
+  );
 }
 
-export interface Course {
-  id: number;
-  user_id: number;
-  title: string;
-  cover: string | null;
-  description: string;
-  created_at: string;
-  updated_at: string;
-  author: CourseAuthor;
-  students: number[]; // daftar id pengguna yang menjadi peserta
-  total_contents: number;
-  avg_ratings: string | null;
+export function getCourse(id: Id) {
+  return apiRequest<{ course: CourseDetail }>("GET", `/courses/${id}`);
 }
 
-export interface CourseContent {
-  id: number;
-  course_id: number;
-  title: string;
-  youtube: string;
-  created_at: string;
-  updated_at: string;
-  my_status_finished: boolean;
+export function postCourse(title: string, description: string) {
+  return apiRequest("POST", "/courses", { title, description });
 }
 
-export interface CourseRating {
-  name: string;
-  ratings: number;
-  comment: string;
+export function postCover(id: Id, file: File) {
+  const form = new FormData();
+  form.append("cover", file);
+  return apiRequest("POST", `/courses/${id}/cover`, form);
 }
 
-export interface CourseDetail extends Omit<Course, "avg_ratings"> {
-  contents: CourseContent[];
-  ratings: CourseRating[];
-  avg_ratings: string | null;
-  my_percentage_finished: string;
+export function putCourse(id: Id, title: string, description: string) {
+  return apiRequest("PUT", `/courses/${id}`, { title, description });
 }
 
-export interface CoursePayload {
-  title: string;
-  description: string;
+export function deleteCourse(id: Id) {
+  return apiRequest("DELETE", `/courses/${id}`);
 }
 
-export interface ContentPayload {
-  title: string;
-  youtube: string;
+export function deleteAllCourses() {
+  return apiRequest("DELETE", "/courses");
 }
 
-export interface RatingPayload {
-  ratings: 1 | 2 | 3 | 4 | 5;
-  comment: string;
+export function postStudent(id: Id) {
+  return apiRequest("POST", `/courses/${id}/students`);
 }
 
-export const courseApi = {
-  // ---- Kursus ----
-  async getCourses(onlyMine = false): Promise<Course[]> {
-    const query = onlyMine ? "?is_me=1" : "";
-    const response = await apiHelper<{ courses: Course[] }>(`/courses${query}`);
-    return response.data!.courses;
-  },
+export function deleteStudent(id: Id) {
+  return apiRequest("DELETE", `/courses/${id}/students`);
+}
 
-  async getCourseById(id: number | string): Promise<CourseDetail> {
-    const response = await apiHelper<{ course: CourseDetail }>(`/courses/${id}`);
-    return response.data!.course;
-  },
+export function putRating(id: Id, ratings: number, comment: string) {
+  return apiRequest("PUT", `/courses/${id}/students/ratings`, {
+    ratings,
+    comment,
+  });
+}
 
-  // Server tidak mengembalikan id kursus baru, jadi sampul diunggah terpisah
-  // lewat changeCover setelah daftar dimuat ulang.
-  addCourse(payload: CoursePayload) {
-    return apiHelper("/courses", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
+export function postContent(courseId: Id, title: string, youtube: string) {
+  return apiRequest("POST", `/courses/${courseId}/contents`, {
+    title,
+    youtube,
+  });
+}
 
-  updateCourse(id: number | string, payload: CoursePayload) {
-    return apiHelper(`/courses/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-  },
+export function getContent(id: Id) {
+  return apiRequest<{ course_content: CourseContent }>(
+    "GET",
+    `/courses/-/contents/${id}`,
+  );
+}
 
-  changeCover(id: number | string, cover: File) {
-    const formData = new FormData();
-    formData.append("cover", cover);
-    return apiHelper(`/courses/${id}/cover`, {
-      method: "POST",
-      body: formData,
-    });
-  },
+export function putContent(id: Id, title: string, youtube: string) {
+  return apiRequest("PUT", `/courses/-/contents/${id}`, { title, youtube });
+}
 
-  deleteCourse(id: number | string) {
-    return apiHelper(`/courses/${id}`, { method: "DELETE" });
-  },
+export function deleteContent(id: Id) {
+  return apiRequest("DELETE", `/courses/-/contents/${id}`);
+}
 
-  deleteAllCourses() {
-    return apiHelper("/courses", { method: "DELETE" });
-  },
-
-  // ---- Peserta ----
-  joinCourse(id: number | string) {
-    return apiHelper(`/courses/${id}/students`, { method: "POST" });
-  },
-
-  leaveCourse(id: number | string) {
-    return apiHelper(`/courses/${id}/students`, { method: "DELETE" });
-  },
-
-  changeRating(id: number | string, payload: RatingPayload) {
-    return apiHelper(`/courses/${id}/students/ratings`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-  },
-
-  // ---- Konten ----
-  addContent(courseId: number | string, payload: ContentPayload) {
-    return apiHelper<{ content_id: number }>(`/courses/${courseId}/contents`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
-
-  updateContent(contentId: number | string, payload: ContentPayload) {
-    return apiHelper(`/courses/-/contents/${contentId}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-  },
-
-  async getContentById(contentId: number | string): Promise<CourseContent> {
-    const response = await apiHelper<{ course_content: CourseContent }>(
-      `/courses/-/contents/${contentId}`
-    );
-    return response.data!.course_content;
-  },
-
-  deleteContent(contentId: number | string) {
-    return apiHelper(`/courses/-/contents/${contentId}`, { method: "DELETE" });
-  },
-
-  changeContentStatus(contentId: number | string, status: 0 | 1) {
-    return apiHelper(`/courses/-/contents/${contentId}/learns`, {
-      method: "POST",
-      body: JSON.stringify({ status }),
-    });
-  },
-};
+export function postLearn(id: Id, status: 0 | 1) {
+  return apiRequest("POST", `/courses/-/contents/${id}/learns`, { status });
+}

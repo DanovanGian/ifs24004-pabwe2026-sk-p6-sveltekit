@@ -1,54 +1,53 @@
-import { writable, get } from "svelte/store";
+import { derived, writable } from "svelte/store";
 import {
   getAccessToken,
+  isSuccess,
   putAccessToken,
   removeAccessToken,
 } from "../../../helpers/apiHelper";
-import { userApi, type User } from "../../users/api/userApi";
+import { withFlag } from "../../../helpers/storeHelper";
+import { getMe } from "../../users/api/userApi";
+import { postLogin, postRegister } from "../api/authApi";
 
-const initialToken = getAccessToken();
-
-export const authToken = writable<string | null>(initialToken);
-export const isAuthenticated = writable<boolean>(false);
+export const authToken = writable<string | null>(getAccessToken());
 export const authProfile = writable<User | null>(null);
-// true selama profil masih dimuat; false setelah selesai (berhasil atau gagal)
-export const isProfile = writable<boolean>(initialToken !== null);
+export const isAuthLoading = writable(false);
 
-export function setIsProfile(value: boolean): void {
-  isProfile.set(value);
-}
+export const isLogin = derived(authToken, ($token) => $token !== null);
+export const isSessionReady = derived(
+  [authToken, authProfile],
+  ([$token, $profile]) => Boolean($token && $profile),
+);
 
-export function setAuthLogin(token: string, profile: User): void {
-  putAccessToken(token);
-  authToken.set(token);
-  authProfile.set(profile);
-  isAuthenticated.set(true);
-  isProfile.set(false);
-}
-
-export function setAuthLogout(): void {
+export function logout(): void {
   removeAccessToken();
   authToken.set(null);
   authProfile.set(null);
-  isAuthenticated.set(false);
-  isProfile.set(false);
 }
 
-// Dipanggil saat aplikasi dibuka: kalau ada token tersimpan, ambil profilnya.
-export async function loadSession(): Promise<void> {
-  if (!get(authToken)) {
-    isProfile.set(false);
-    return;
+/** Memuat profil; bila token ditolak server, sesi dibersihkan. */
+export async function loadProfile(): Promise<boolean> {
+  const response = await getMe();
+  if (isSuccess(response)) {
+    authProfile.set(response.data.user);
+    return true;
   }
+  logout();
+  return false;
+}
 
-  isProfile.set(true);
-  try {
-    const profile = await userApi.getProfile();
-    authProfile.set(profile);
-    isAuthenticated.set(true);
-  } catch {
-    setAuthLogout();
-    return;
-  }
-  isProfile.set(false);
+export function login(email: string, password: string) {
+  return withFlag(isAuthLoading, async () => {
+    const response = await postLogin(email, password);
+    if (isSuccess(response)) {
+      putAccessToken(response.data.token);
+      authToken.set(response.data.token);
+      await loadProfile();
+    }
+    return response;
+  });
+}
+
+export function register(name: string, email: string, password: string) {
+  return withFlag(isAuthLoading, () => postRegister(name, email, password));
 }
