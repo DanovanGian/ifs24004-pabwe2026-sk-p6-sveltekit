@@ -3,6 +3,11 @@
   "framework": null,
   "buildCommand": "npx vite build",
   "outputDirectory": "build",
+  "build": {
+    "env": {
+      "VITE_DELCOM_BASEURL": "https://open-api.delcom.org/api/v1"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
