@@ -1,1 +1,0 @@
-import{t as e}from"./CfWR-2Si.js";var t={register(t){return e(`/auth/register`,{method:`POST`,body:JSON.stringify(t)})},async login(t){return(await e(`/auth/login`,{method:`POST`,body:JSON.stringify(t)})).data},logout(){return e(`/auth/logout`,{method:`POST`})}};export{t};

@@ -1,1 +1,0 @@
-import{s as e}from"./O1NhY2OY.js";import"./BQ_vTcgT.js";function t(t=``){let n=e(t);return{value:n,onChange:e=>{n.set(e.target.value)},reset:()=>n.set(t)}}export{t};
